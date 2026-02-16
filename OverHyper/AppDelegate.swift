@@ -3,9 +3,11 @@ import Cocoa
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     var statusItem: NSStatusItem!
+    var overlayController: OverlayWindowController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusBar()
+        overlayController = OverlayWindowController()
     }
 
     private func setupStatusBar() {
