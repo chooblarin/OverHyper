@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		01A100002F43000000EAC775 /* MASShortcut in Frameworks */ = {isa = PBXBuildFile; productRef = 01A100022F43000000EAC775 /* MASShortcut */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		019207FE2F42A48E00EAC775 /* OverHyper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OverHyper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				01A100002F43000000EAC775 /* MASShortcut in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 			);
 			name = OverHyper;
 			packageProductDependencies = (
+				01A100022F43000000EAC775 /* MASShortcut */,
 			);
 			productName = OverHyper;
 			productReference = 019207FE2F42A48E00EAC775 /* OverHyper.app */;
@@ -107,6 +113,9 @@
 			);
 			mainGroup = 019207F52F42A48E00EAC775;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				01A100012F43000000EAC775 /* XCLocalSwiftPackageReference "Vendor/MASShortcut" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 019207FF2F42A48E00EAC775 /* Products */;
 			projectDirPath = "";
@@ -346,6 +355,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		01A100012F43000000EAC775 /* XCLocalSwiftPackageReference "Vendor/MASShortcut" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/MASShortcut;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		01A100022F43000000EAC775 /* MASShortcut */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 01A100012F43000000EAC775 /* XCLocalSwiftPackageReference "Vendor/MASShortcut" */;
+			productName = MASShortcut;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 019207F62F42A48E00EAC775 /* Project object */;
 }

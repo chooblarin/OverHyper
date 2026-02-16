@@ -1,20 +1,15 @@
-//
-//  OverHyperApp.swift
-//  OverHyper
-//
-//  Created by Sota Hatakeyama on 2026/02/16.
-//
-
 import SwiftUI
 
 @main
 struct OverHyperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self)
-    var appDelegate
+    private var appDelegate
+
+    private let settingsStore = EffectSettingsStore.shared
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            SettingsView(settingsStore: settingsStore)
         }
     }
 }
