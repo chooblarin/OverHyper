@@ -31,6 +31,18 @@ It renders stage effects such as confetti and flash overlays across all connecte
 2. Select the `OverHyper` scheme.
 3. Build and run.
 
+## Build For Self Use
+
+If you only use the app on your own Mac, use the local build flow:
+
+```bash
+./scripts/build-local-app.sh
+open dist/OverHyper.app
+```
+
+This does not require notarization.
+Detailed steps are in `./docs/LOCAL_SELF_USE.md`.
+
 ## Operation
 
 - Menu bar icon: `⚡️`
