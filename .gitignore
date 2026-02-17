@@ -4,3 +4,7 @@
 /Vendor/bundle/
 /fastlane/.env.local
 /fastlane/.env.*.local
+*.xcuserdatad/
+*.xcuserstate
+/fastlane/dist/
+/fastlane/report.xml
