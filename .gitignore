@@ -1,1 +1,6 @@
 /dist/
+/.bundle/
+/vendor/bundle/
+/Vendor/bundle/
+/fastlane/.env.local
+/fastlane/.env.*.local

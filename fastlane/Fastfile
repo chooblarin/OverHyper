@@ -1,0 +1,133 @@
+default_platform(:mac)
+
+platform :mac do
+  before_all do
+    load_local_env
+
+    ensure_env_vars(
+      env_vars: %w[
+        OVERHYPER_TEAM_ID
+        OVERHYPER_CODE_SIGN_IDENTITY
+        OVERHYPER_APP_IDENTIFIER
+      ]
+    )
+
+    verify_env_values
+    verify_xcode_cli
+    verify_signing_identity
+  end
+
+  private_lane :load_local_env do
+    env_file = File.join(__dir__, ".env.local")
+    return unless File.exist?(env_file)
+
+    require "dotenv"
+    Dotenv.overload(env_file)
+  end
+
+  private_lane :verify_env_values do
+    if ENV.fetch("OVERHYPER_TEAM_ID") == "YOUR_TEAM_ID"
+      UI.user_error!(
+        "OVERHYPER_TEAM_ID is still a template value. " \
+        "Set it in fastlane/.env.local and run with --env local."
+      )
+    end
+
+    identity_template = "Apple Development: Your Name (TEAMID)"
+    if ENV.fetch("OVERHYPER_CODE_SIGN_IDENTITY") == identity_template
+      UI.user_error!(
+        "OVERHYPER_CODE_SIGN_IDENTITY is still a template value. " \
+        "Set it in fastlane/.env.local and run with --env local."
+      )
+    end
+  end
+
+  private_lane :verify_xcode_cli do
+    sh("xcodebuild -version")
+  rescue StandardError => error
+    UI.user_error!(
+      "Xcode command line tools are not available: #{error.message}"
+    )
+  end
+
+  private_lane :verify_signing_identity do
+    identity_list = sh(
+      "security find-identity -v -p codesigning",
+      log: false
+    )
+
+    if identity_list.include?("0 valid identities found")
+      UI.user_error!(
+        "No valid code-signing identities found in keychain. " \
+        "Create an Apple Development certificate in Xcode " \
+        "(Settings > Accounts > Manage Certificates)."
+      )
+    end
+
+    expected_identity = ENV.fetch("OVERHYPER_CODE_SIGN_IDENTITY")
+    unless identity_list.include?(expected_identity)
+      UI.user_error!(
+        "Signing identity not found: #{expected_identity}. " \
+        "Check your keychain or update OVERHYPER_CODE_SIGN_IDENTITY."
+      )
+    end
+  end
+
+  private_lane :clean_dist do
+    sh("mkdir -p dist")
+    sh("rm -rf dist/OverHyper.app")
+  end
+
+  lane :self_use_build do
+    require "shellwords"
+
+    build_path = "/tmp/OverHyperBuild"
+    derived_data_path = "/tmp/OverHyperDerivedRelease"
+    packages_path = "/tmp/OverHyperPackages"
+    app_product_path = "#{derived_data_path}/Build/Products/Release/OverHyper.app"
+    escaped_identity = Shellwords.escape(ENV.fetch("OVERHYPER_CODE_SIGN_IDENTITY"))
+
+    clean_dist
+
+    build_mac_app(
+      project: "OverHyper.xcodeproj",
+      scheme: "OverHyper",
+      configuration: "Release",
+      clean: true,
+      skip_archive: true,
+      skip_package_pkg: true,
+      build_path: build_path,
+      derived_data_path: derived_data_path,
+      cloned_source_packages_path: packages_path,
+      xcargs: [
+        "DEVELOPMENT_TEAM=#{ENV.fetch('OVERHYPER_TEAM_ID')}",
+        "CODE_SIGN_IDENTITY=#{escaped_identity}",
+        "PRODUCT_BUNDLE_IDENTIFIER=#{ENV.fetch('OVERHYPER_APP_IDENTIFIER')}",
+        "CODE_SIGN_STYLE=Manual",
+      ].join(" ")
+    )
+
+    unless File.directory?(app_product_path)
+      UI.user_error!("Built app not found: #{app_product_path}")
+    end
+
+    sh("ditto '#{app_product_path}' dist/OverHyper.app")
+
+    UI.success("Built app: dist/OverHyper.app")
+    UI.message("Launch with: open dist/OverHyper.app")
+  end
+
+  after_all do |lane|
+    next unless lane == :self_use_build
+
+    UI.success("fastlane self_use_build completed")
+    UI.message("Built app: dist/OverHyper.app")
+    UI.message("Launch with: open dist/OverHyper.app")
+  end
+
+  error do |lane, exception|
+    UI.error("fastlane lane failed: #{lane}")
+    UI.error(exception.message)
+    UI.important("Retry with: bundle exec fastlane self_use_build --env local")
+  end
+end

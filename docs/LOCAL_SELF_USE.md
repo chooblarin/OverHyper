@@ -1,44 +1,119 @@
-# Local Self-Use Build Guide
+# Local Self-Use Setup And Build
 
-This guide is for personal use on your own Mac.
-It does not require Developer ID signing or notarization.
+This document is the single guide for local environment setup and self-use builds.
+It targets local app launch on your own Mac and does not include notarization.
 
-## Goal
+## 1. Environment Setup
 
-Build `OverHyper.app` and launch it like a normal application from Finder.
-
-## Prerequisites
+### 1.1 Prerequisites
 
 1. Xcode is installed.
-2. You can build the project in Xcode at least once.
+2. Apple Development certificate is available in your login keychain.
+3. Homebrew is available.
 
-## Build
+### 1.2 Ruby And Bundler
+
+Use Homebrew Ruby to avoid system Ruby/Bundler drift.
+
+```bash
+brew install ruby
+export PATH="$(brew --prefix ruby)/bin:$PATH"
+ruby -v
+bundle -v
+```
+
+### 1.3 Project Dependencies
 
 Run from project root:
 
 ```bash
-./scripts/build-local-app.sh
+bundle config set --local path vendor/bundle
+bundle install
 ```
 
-This creates:
+## 2. fastlane Env File Setup
 
+Create local env file:
+
+```bash
+cp fastlane/.env.default fastlane/.env.local
+```
+
+Check your signing identity:
+
+```bash
+security find-identity -v -p codesigning ~/Library/Keychains/login.keychain-db
+```
+
+Set `fastlane/.env.local`:
+
+```dotenv
+OVERHYPER_TEAM_ID=YOUR_TEAM_ID
+OVERHYPER_CODE_SIGN_IDENTITY=Apple Development: Your Name (TEAMID)
+OVERHYPER_APP_IDENTIFIER=com.sotahatakeyama.OverHyper
+```
+
+Notes:
+- `OVERHYPER_TEAM_ID` must match the team in your certificate.
+- `OVERHYPER_CODE_SIGN_IDENTITY` must exactly match one line from `security find-identity`.
+- `fastlane/.env.local` is git-ignored.
+
+## 3. Build
+
+Run:
+
+```bash
+bundle exec fastlane self_use_build
+```
+
+Expected output:
 - `dist/OverHyper.app`
 
-## Launch
+`fastlane/.env.local` is loaded automatically.
+`--env local` is optional if you prefer dotenv switching.
+
+## 4. Launch
 
 ```bash
 open dist/OverHyper.app
 ```
 
-You can also drag `dist/OverHyper.app` into `/Applications` and launch it from there.
+Optional:
+- Move `dist/OverHyper.app` into `/Applications`.
 
-## Notes
+## 5. Troubleshooting
 
-1. This flow is intended only for your own machine.
-2. For distribution to other users, use Developer ID signing + notarization.
-3. If you see a Gatekeeper warning after copying from external storage,
-   remove quarantine on your own machine only:
+### Missing env vars
+
+`before_all` stops with a message indicating the missing key.
+
+### Template values are still set
+
+Replace `YOUR_TEAM_ID` or `Apple Development: Your Name (TEAMID)` in `fastlane/.env.local`.
+
+### Signing identity not found
+
+Make `OVERHYPER_CODE_SIGN_IDENTITY` match:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/OverHyper.app
+security find-identity -v -p codesigning ~/Library/Keychains/login.keychain-db
 ```
+
+### 0 valid identities found
+
+No usable Apple Development certificate is installed in your login keychain.
+Create one from Xcode:
+
+1. Xcode > Settings > Accounts
+2. Select your Apple ID and team
+3. Manage Certificates...
+4. Add `Apple Development`
+
+### No certificate for team matching identity
+
+The team ID and certificate are inconsistent.
+Use the team ID that belongs to the selected certificate.
+
+### Xcode CLI missing
+
+Install/fix command line tools and rerun.

@@ -27,7 +27,7 @@ It renders stage effects such as confetti and flash overlays across all connecte
 
 ## Run
 
-1. Open `./OverHyper.xcodeproj` in Xcode.
+1. Open `OverHyper.xcodeproj` in Xcode.
 2. Select the `OverHyper` scheme.
 3. Build and run.
 
@@ -36,12 +36,17 @@ It renders stage effects such as confetti and flash overlays across all connecte
 If you only use the app on your own Mac, use the local build flow:
 
 ```bash
-./scripts/build-local-app.sh
+export PATH="$(brew --prefix ruby)/bin:$PATH"
+bundle config set --local path vendor/bundle
+bundle install
+cp fastlane/.env.default fastlane/.env.local
+# Edit fastlane/.env.local with your own values
+bundle exec fastlane self_use_build
 open dist/OverHyper.app
 ```
 
 This does not require notarization.
-Detailed steps are in `./docs/LOCAL_SELF_USE.md`.
+Environment setup and build steps are documented in `docs/LOCAL_SELF_USE.md`.
 
 ## Operation
 
