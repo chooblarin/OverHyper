@@ -48,6 +48,12 @@ open dist/OverHyper.app
 This does not require notarization.
 Environment setup and build steps are documented in `docs/LOCAL_SELF_USE.md`.
 
+## Documentation
+
+- Local self-use setup and build: `docs/LOCAL_SELF_USE.md`
+- External distribution signing/notarization notes: `docs/NOTARIZATION.md`
+- Swift style review checklist: `docs/STYLE_CHECKLIST.md`
+
 ## Operation
 
 - Menu bar icon: `⚡️`
