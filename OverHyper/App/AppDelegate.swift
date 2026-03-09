@@ -5,6 +5,7 @@ import OSLog
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var runtime: AppRuntime?
+    private var openSettingsAction: (@MainActor () -> Void)?
 
     private let logger = Logger(subsystem: "OverHyper", category: "AppDelegate")
 
@@ -88,6 +89,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         runtime?.fire(effect)
     }
 
+    func setOpenSettingsAction(_ action: @escaping @MainActor () -> Void) {
+        openSettingsAction = action
+    }
+
+    func showSettingsWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async { [logger, openSettingsAction] in
+            guard let openSettingsAction else {
+                logger.error("Failed to open settings window")
+                return
+            }
+
+            openSettingsAction()
+        }
+    }
+
     @objc private func fireConfetti() {
         fire(.confetti)
     }
@@ -101,18 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.async { [logger] in
-            let didOpen = NSApp.sendAction(
-                Selector(("showSettingsWindow:")),
-                to: nil,
-                from: nil
-            )
-
-            if !didOpen {
-                logger.error("Failed to open settings window from status menu")
-            }
-        }
+        showSettingsWindow()
     }
 
     @objc private func quit() {
