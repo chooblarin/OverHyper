@@ -1,15 +1,16 @@
 # OverHyper
 
 OverHyper is a macOS menu bar app for live talks.
-It renders stage effects such as confetti and flash overlays across all connected displays.
+It renders stage effects such as confetti, flash, and glitch overlays across all connected displays.
 
 ## Stack
 
 - Overlay windows: AppKit (`NSWindow`, `NSStatusItem`)
 - Settings UI: SwiftUI
-- Effects: Core Animation (`CAEmitterLayer`)
+- Effects: Core Animation (`CAEmitterLayer`) and Metal (`MTKView`, shaders)
 - Global shortcut: MASShortcut
 - Persistence: UserDefaults
+- Screen capture: ScreenCaptureKit
 
 ## Implemented Features
 
@@ -17,7 +18,9 @@ It renders stage effects such as confetti and flash overlays across all connecte
 - Full-screen, click-through overlay windows on all displays
 - Confetti effect
 - Flash effect
-- Global hotkey (`Control + Option + Command + C` by default)
+- Glitch effect with frozen-frame shader animation
+- Global hotkey (`Control + Option + Command + G` by default)
+- Screen Recording permission flow for glitch capture
 - Settings window with:
   - Intensity preset (`Low`, `Standard`, `High`)
   - Confetti duration
@@ -60,28 +63,40 @@ Environment setup and build steps are documented in `docs/LOCAL_SELF_USE.md`.
 - Menu actions:
   - `Fire Confetti`
   - `Fire Flash`
+  - `Fire Glitch`
   - `Settings...`
   - `Quit OverHyper`
-- Global hotkey defaults to `Control + Option + Command + C` and is configurable in Settings.
+- Global hotkey defaults to `Control + Option + Command + G` and is configurable in Settings.
 
 ## Project Structure
 
 ```text
 OverHyper/
-├── OverHyperApp.swift              # App entry point and Settings scene
-├── AppDelegate.swift               # NSStatusItem menu lifecycle
-├── AppRuntime.swift                # Runtime wiring (overlay/effects/hotkey)
-├── OverlayWindowController.swift   # Full-screen overlay windows per display
-├── EffectOrchestrator.swift        # Effect dispatch from UI/hotkey
-├── OverlayEffect.swift             # Effect protocol
-├── ConfettiEffect.swift            # Confetti renderer (CAEmitterLayer)
-├── FlashEffect.swift               # Flash renderer
-├── EffectKind.swift                # Effect enum
-├── EffectSettings.swift            # Effect model and intensity presets
-├── EffectSettingsStore.swift       # UserDefaults-backed settings state
-├── HotkeyService.swift             # MASShortcut binding and migration
-├── SettingsView.swift              # SwiftUI settings UI
-└── MASShortcutRecorderField.swift  # MASShortcutView bridge for SwiftUI
+├── App/
+│   ├── OverHyperApp.swift          # App entry point and Settings scene
+│   ├── AppDelegate.swift           # Status item lifecycle and menu actions
+│   └── AppRuntime.swift            # Runtime wiring (overlay/effects/hotkey)
+├── Overlay/
+│   └── OverlayWindowController.swift
+├── Effects/
+│   ├── EffectKind.swift
+│   ├── EffectOrchestrator.swift
+│   ├── EffectSettings.swift
+│   ├── EffectSettingsStore.swift
+│   ├── OverlayEffect.swift
+│   ├── ConfettiEffect.swift
+│   ├── FlashEffect.swift
+│   └── GlitchEffect.swift
+├── Metal/
+│   ├── MetalOverlayView.swift
+│   ├── MetalRenderer.swift
+│   └── Shaders.metal
+├── Capture/
+│   └── ScreenCaptureService.swift
+└── UI/
+    ├── HotkeyService.swift
+    ├── SettingsView.swift
+    └── MASShortcutRecorderField.swift
 ```
 
 ### Data Flow (High Level)
@@ -96,10 +111,12 @@ OverHyper/
 
 1. Confetti appears on all connected displays.
 2. Flash appears when enabled.
-3. Repeated triggers stack without crashing.
-4. Hotkey triggers confetti even when another app is focused.
-5. Changing displays or spaces does not break effects.
-6. Settings are persisted after app restart.
+3. Glitch captures the current display image and plays for about one second.
+4. Glitch requests Screen Recording permission when needed and aborts cleanly if denied.
+5. Repeated triggers stack without crashing.
+6. Hotkey triggers glitch even when another app is focused.
+7. Changing displays or spaces does not break effects.
+8. Settings are persisted after app restart.
 
 ## Style Guide
 

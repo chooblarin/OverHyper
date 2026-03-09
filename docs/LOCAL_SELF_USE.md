@@ -81,6 +81,12 @@ open dist/OverHyper.app
 Optional:
 - Move `dist/OverHyper.app` into `/Applications`.
 
+### First launch notes
+
+- The app runs as a menu bar utility with the `⚡️` icon.
+- `Glitch` requires Screen Recording permission because it captures a single frame of the display with ScreenCaptureKit.
+- The default global hotkey is `Control + Option + Command + G`.
+
 ## 5. Troubleshooting
 
 ### Missing env vars
@@ -117,3 +123,8 @@ Use the team ID that belongs to the selected certificate.
 ### Xcode CLI missing
 
 Install/fix command line tools and rerun.
+
+### Glitch effect shows a permission alert
+
+Allow Screen Recording for OverHyper in System Settings and relaunch if needed.
+The confetti and flash effects do not require Screen Recording permission.
