@@ -19,13 +19,11 @@ It renders stage effects such as confetti, flash, and glitch overlays across all
 - Confetti effect
 - Flash effect
 - Glitch effect with frozen-frame shader animation
-- Global hotkey (`Control + Option + Command + G` by default)
+- Preset global hotkey slots (`Control + Option + Command + 1...5`)
 - Screen Recording permission flow for glitch capture
 - Settings window with:
-  - Intensity preset (`Low`, `Standard`, `High`)
-  - Confetti duration
-  - Flash enable/disable
-  - Hotkey recorder
+  - Effect test fire buttons
+  - Hotkey slot assignment for `Confetti` / `Flash` / `Glitch`
 - Runtime screen/space change handling
 
 ## Run
@@ -66,7 +64,7 @@ Environment setup and build steps are documented in `docs/LOCAL_SELF_USE.md`.
   - `Fire Glitch`
   - `Settings...`
   - `Quit OverHyper`
-- Global hotkey defaults to `Control + Option + Command + G` and is configurable in Settings.
+- Preset hotkey defaults are `Control + Option + Command + 1 = Confetti`, `2 = Flash`, `3 = Glitch`.
 
 ## Project Structure
 
@@ -95,8 +93,8 @@ OverHyper/
 │   └── ScreenCaptureService.swift
 └── UI/
     ├── HotkeyService.swift
-    ├── SettingsView.swift
-    └── MASShortcutRecorderField.swift
+    ├── HotkeySlot.swift
+    └── SettingsView.swift
 ```
 
 ### Data Flow (High Level)
@@ -110,11 +108,11 @@ OverHyper/
 ## Manual E2E Checklist
 
 1. Confetti appears on all connected displays.
-2. Flash appears when enabled.
+2. Flash appears when triggered.
 3. Glitch captures the current display image and plays for about one second.
 4. Glitch requests Screen Recording permission when needed and aborts cleanly if denied.
 5. Repeated triggers stack without crashing.
-6. Hotkey triggers glitch even when another app is focused.
+6. Preset hotkey slots trigger their assigned effects even when another app is focused.
 7. Changing displays or spaces does not break effects.
 8. Settings are persisted after app restart.
 

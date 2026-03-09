@@ -85,7 +85,7 @@ Optional:
 
 - The app runs as a menu bar utility with the `⚡️` icon.
 - `Glitch` requires Screen Recording permission because it captures a single frame of the display with ScreenCaptureKit.
-- The default global hotkey is `Control + Option + Command + G`.
+- Default hotkey slots are `Control + Option + Command + 1 = Confetti`, `2 = Flash`, `3 = Glitch`.
 
 ## 5. Troubleshooting
 

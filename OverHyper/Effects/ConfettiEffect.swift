@@ -1,8 +1,15 @@
 import AppKit
+import CoreGraphics
 import QuartzCore
 
 final class ConfettiEffect: OverlayEffect {
     private static let particleImage = ConfettiEffect.makeParticleImage()
+    private enum Constants {
+        static let duration: TimeInterval = 1.6
+        static let birthRate: Float = 108
+        static let velocity: CGFloat = 420
+        static let spinRange: CGFloat = 2.2
+    }
 
     func fire(in context: OverlayRenderContext, settings: EffectSettings) {
         let layer = context.layer
@@ -20,11 +27,11 @@ final class ConfettiEffect: OverlayEffect {
         emitterLayer.emitterSize = CGSize(width: 8, height: 8)
         emitterLayer.renderMode = .oldestFirst
         emitterLayer.birthRate = 1
-        emitterLayer.emitterCells = makeCells(settings: settings)
+        emitterLayer.emitterCells = makeCells()
 
         layer.addSublayer(emitterLayer)
 
-        let stopDelay = settings.confettiDuration
+        let stopDelay = Constants.duration
         DispatchQueue.main.asyncAfter(deadline: .now() + stopDelay) {
             emitterLayer.birthRate = 0
         }
@@ -35,21 +42,21 @@ final class ConfettiEffect: OverlayEffect {
         }
     }
 
-    private func makeCells(settings: EffectSettings) -> [CAEmitterCell] {
+    private func makeCells() -> [CAEmitterCell] {
         Colors.palette.enumerated().map { index, color in
             let cell = CAEmitterCell()
             cell.contents = Self.particleImage
-            cell.birthRate = settings.intensityPreset.confettiBirthRate
-            cell.lifetime = Float(settings.confettiDuration + 4.2)
+            cell.birthRate = Constants.birthRate
+            cell.lifetime = Float(Constants.duration + 4.2)
             cell.lifetimeRange = 1.0
-            cell.velocity = settings.intensityPreset.confettiVelocity * 1.15
-            cell.velocityRange = settings.intensityPreset.confettiVelocity * 0.18
+            cell.velocity = Constants.velocity * 1.15
+            cell.velocityRange = Constants.velocity * 0.18
             cell.emissionLongitude = Double.pi / 2
             cell.emissionRange = Double.pi / 4
             cell.yAcceleration = -150
             cell.xAcceleration = Drift.horizontalAcceleration(for: index)
             cell.spin = 2.5
-            cell.spinRange = settings.intensityPreset.confettiSpinRange
+            cell.spinRange = Constants.spinRange
             cell.scale = 0.58
             cell.scaleRange = 0.24
             cell.color = color.cgColor

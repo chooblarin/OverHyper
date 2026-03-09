@@ -9,7 +9,9 @@ struct OverHyperApp: App {
 
     var body: some Scene {
         Settings {
-            SettingsView(settingsStore: settingsStore)
+            SettingsView(settingsStore: settingsStore) { effect in
+                appDelegate.fire(effect)
+            }
         }
     }
 }

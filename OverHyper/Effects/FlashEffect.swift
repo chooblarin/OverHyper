@@ -2,11 +2,11 @@ import AppKit
 import QuartzCore
 
 final class FlashEffect: OverlayEffect {
-    func fire(in context: OverlayRenderContext, settings: EffectSettings) {
-        guard settings.flashEnabled else {
-            return
-        }
+    private enum Constants {
+        static let opacity: Float = 0.18
+    }
 
+    func fire(in context: OverlayRenderContext, settings: EffectSettings) {
         let layer = context.layer
         let flashLayer = CALayer()
         flashLayer.frame = layer.bounds
@@ -16,7 +16,7 @@ final class FlashEffect: OverlayEffect {
         layer.addSublayer(flashLayer)
 
         let animation = CAKeyframeAnimation(keyPath: "opacity")
-        animation.values = [0.0, settings.intensityPreset.flashOpacity, 0.0]
+        animation.values = [0.0, Constants.opacity, 0.0]
         animation.keyTimes = [0.0, 0.35, 1.0]
         animation.duration = 0.34
         animation.timingFunctions = [

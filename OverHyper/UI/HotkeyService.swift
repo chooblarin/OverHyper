@@ -1,78 +1,60 @@
 import AppKit
-import Carbon.HIToolbox
 import MASShortcut
 import OSLog
 
 @MainActor
 final class HotkeyService {
-    private let defaults: UserDefaults
-    private let defaultsKey: String
-    private let legacyDefaultsKey: String
-    private let binder: MASShortcutBinder
-    private let onTrigger: () -> Void
+    private let settingsStore: EffectSettingsStore
+    private let shortcutMonitor: MASShortcutMonitor
+    private let onTrigger: (EffectKind) -> Void
     private let logger = Logger(subsystem: "OverHyper", category: "Hotkey")
+    private var registeredShortcuts: [HotkeySlotID: MASShortcut] = [:]
 
     init(
-        defaults: UserDefaults = .standard,
-        defaultsKey: String = EffectSettingsStore.hotkeyDefaultsKey,
-        legacyDefaultsKey: String = EffectSettingsStore.legacyHotkeyDefaultsKey,
-        binder: MASShortcutBinder = MASShortcutBinder.shared(),
-        onTrigger: @escaping () -> Void
+        settingsStore: EffectSettingsStore,
+        shortcutMonitor: MASShortcutMonitor = MASShortcutMonitor.shared(),
+        onTrigger: @escaping (EffectKind) -> Void
     ) {
-        self.defaults = defaults
-        self.defaultsKey = defaultsKey
-        self.legacyDefaultsKey = legacyDefaultsKey
-        self.binder = binder
+        self.settingsStore = settingsStore
+        self.shortcutMonitor = shortcutMonitor
         self.onTrigger = onTrigger
     }
 
     func start() {
-        configureBindingOptions()
-        migrateLegacyShortcutIfNeeded()
-        registerDefaultIfNeeded()
-        binder.bindShortcut(withDefaultsKey: defaultsKey, toAction: onTrigger)
-        logger.info("Global hotkey binding active")
+        registerShortcuts()
+        logger.info("Preset hotkey bindings active")
     }
 
     func stop() {
-        binder.breakBinding(withDefaultsKey: defaultsKey)
+        for shortcut in registeredShortcuts.values {
+            shortcutMonitor.unregisterShortcut(shortcut)
+        }
+        registeredShortcuts.removeAll()
     }
 
-    private func registerDefaultIfNeeded() {
-        guard defaults.object(forKey: defaultsKey) == nil else {
-            return
+    private func registerShortcuts() {
+        stop()
+
+        for slotID in HotkeySlotID.allCases {
+            let shortcut = slotID.shortcut
+            let didRegister = shortcutMonitor.register(shortcut) { [weak self] in
+                guard let self else {
+                    return
+                }
+
+                guard let effect = self.settingsStore.assignedEffect(for: slotID) else {
+                    return
+                }
+
+                self.onTrigger(effect)
+            }
+
+            guard didRegister else {
+                logger.error("Failed to register hotkey for \(slotID.rawValue, privacy: .public)")
+                continue
+            }
+
+            registeredShortcuts[slotID] = shortcut
         }
-
-        let shortcut = MASShortcut(
-            keyCode: Int(kVK_ANSI_G),
-            modifierFlags: [.control, .option, .command]
-        )
-
-        let shortcuts: [String: MASShortcut] = [
-            defaultsKey: shortcut,
-        ]
-
-        binder.registerDefaultShortcuts(shortcuts)
-        logger.debug("Registered default hotkey: control+option+command+G")
-    }
-
-    private func configureBindingOptions() {
-        binder.bindingOptions = [
-            NSBindingOption.valueTransformerName: MASDictionaryTransformerName,
-        ]
-    }
-
-    private func migrateLegacyShortcutIfNeeded() {
-        guard defaults.object(forKey: defaultsKey) == nil else {
-            return
-        }
-
-        guard let legacyValue = defaults.object(forKey: legacyDefaultsKey) else {
-            return
-        }
-
-        defaults.set(legacyValue, forKey: defaultsKey)
-        defaults.removeObject(forKey: legacyDefaultsKey)
-        logger.debug("Migrated legacy hotkey key")
     }
 }

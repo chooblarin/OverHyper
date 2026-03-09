@@ -18,8 +18,8 @@ final class AppRuntime {
         )
 
         effectOrchestrator = orchestrator
-        hotkeyService = HotkeyService { [weak orchestrator] in
-            orchestrator?.fire(.glitch)
+        hotkeyService = HotkeyService(settingsStore: settingsStore) { [weak orchestrator] effect in
+            orchestrator?.fire(effect)
         }
     }
 

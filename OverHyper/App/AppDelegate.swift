@@ -39,17 +39,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(makeMenuItem(
             title: "Fire Confetti",
             action: #selector(fireConfetti),
-            keyEquivalent: "f"
+            keyEquivalent: ""
         ))
         menu.addItem(makeMenuItem(
             title: "Fire Flash",
             action: #selector(fireFlash),
-            keyEquivalent: "l"
+            keyEquivalent: ""
         ))
         menu.addItem(makeMenuItem(
             title: "Fire Glitch",
             action: #selector(fireGlitch),
-            keyEquivalent: "g"
+            keyEquivalent: ""
         ))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(makeMenuItem(
@@ -78,25 +78,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: keyEquivalent
         )
         item.target = self
-        item.keyEquivalentModifierMask = [.command]
+        if !keyEquivalent.isEmpty {
+            item.keyEquivalentModifierMask = [.command]
+        }
         return item
     }
 
+    func fire(_ effect: EffectKind) {
+        runtime?.fire(effect)
+    }
+
     @objc private func fireConfetti() {
-        runtime?.fire(.confetti)
+        fire(.confetti)
     }
 
     @objc private func fireFlash() {
-        runtime?.fire(.flash)
+        fire(.flash)
     }
 
     @objc private func fireGlitch() {
-        runtime?.fire(.glitch)
+        fire(.glitch)
     }
 
     @objc private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        DispatchQueue.main.async { [logger] in
+            let didOpen = NSApp.sendAction(
+                Selector(("showSettingsWindow:")),
+                to: nil,
+                from: nil
+            )
+
+            if !didOpen {
+                logger.error("Failed to open settings window from status menu")
+            }
+        }
     }
 
     @objc private func quit() {

@@ -2,47 +2,54 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settingsStore: EffectSettingsStore
-
-    private var confettiDurationText: String {
-        settingsStore.confettiDuration.formatted(
-            .number.precision(.fractionLength(1))
-        )
-    }
+    let onTestFire: (EffectKind) -> Void
 
     var body: some View {
         Form {
-            Section("Confetti") {
-                Picker("Intensity", selection: $settingsStore.intensityPreset) {
-                    ForEach(IntensityPreset.allCases) { preset in
-                        Text(preset.displayName).tag(preset)
+            Section("Try Effects") {
+                HStack {
+                    ForEach(EffectKind.allCases) { effect in
+                        Button(effect.displayName) {
+                            onTestFire(effect)
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 }
+            }
 
-                HStack {
-                    Slider(
-                        value: $settingsStore.confettiDuration,
-                        in: 0.8...4.0,
-                        step: 0.1
-                    )
-                    Text("\(confettiDurationText) s")
-                        .frame(width: 44, alignment: .trailing)
-                        .monospacedDigit()
+            Section("Hotkey Slots") {
+                ForEach(settingsStore.hotkeyAssignments) { assignment in
+                    HStack {
+                        Text(assignment.slotID.displayName)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Picker(
+                            "Assigned Effect",
+                            selection: assignmentBinding(for: assignment.slotID)
+                        ) {
+                            Text("None").tag(EffectKind?.none)
+                            ForEach(EffectKind.allCases) { effect in
+                                Text(effect.displayName).tag(Optional(effect))
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 160)
+                    }
                 }
-            }
-
-            Section("Secondary Effect") {
-                Toggle("Enable flash effect", isOn: $settingsStore.flashEnabled)
-            }
-
-            Section("Global Hotkey") {
-                MASShortcutRecorderField(defaultsKey: EffectSettingsStore.hotkeyDefaultsKey)
-                    .frame(height: 25)
-                Text("Default: Control + Option + Command + G")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(18)
-        .frame(width: 440)
+        .frame(width: 520)
+    }
+
+    private func assignmentBinding(for slotID: HotkeySlotID) -> Binding<EffectKind?> {
+        Binding(
+            get: {
+                settingsStore.assignedEffect(for: slotID)
+            },
+            set: { newValue in
+                settingsStore.setAssignedEffect(newValue, for: slotID)
+            }
+        )
     }
 }
