@@ -13,12 +13,13 @@ final class AppRuntime {
             overlayController: overlayController,
             settingsStore: settingsStore,
             confettiEffect: ConfettiEffect(),
-            flashEffect: FlashEffect()
+            flashEffect: FlashEffect(),
+            glitchEffect: GlitchEffect()
         )
 
         effectOrchestrator = orchestrator
         hotkeyService = HotkeyService { [weak orchestrator] in
-            orchestrator?.fire(.confetti)
+            orchestrator?.fire(.glitch)
         }
     }
 

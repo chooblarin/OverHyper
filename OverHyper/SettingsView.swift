@@ -37,7 +37,7 @@ struct SettingsView: View {
             Section("Global Hotkey") {
                 MASShortcutRecorderField(defaultsKey: EffectSettingsStore.hotkeyDefaultsKey)
                     .frame(height: 25)
-                Text("Default: Control + Option + Command + C")
+                Text("Default: Control + Option + Command + G")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -46,6 +46,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(fireFlash),
             keyEquivalent: "l"
         ))
+        menu.addItem(makeMenuItem(
+            title: "Fire Glitch",
+            action: #selector(fireGlitch),
+            keyEquivalent: "g"
+        ))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(makeMenuItem(
             title: "Settings...",
@@ -83,6 +88,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func fireFlash() {
         runtime?.fire(.flash)
+    }
+
+    @objc private func fireGlitch() {
+        runtime?.fire(.glitch)
     }
 
     @objc private func openSettings() {

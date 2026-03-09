@@ -2,11 +2,12 @@ import AppKit
 import QuartzCore
 
 final class FlashEffect: OverlayEffect {
-    func fire(on layer: CALayer, settings: EffectSettings) {
+    func fire(in context: OverlayRenderContext, settings: EffectSettings) {
         guard settings.flashEnabled else {
             return
         }
 
+        let layer = context.layer
         let flashLayer = CALayer()
         flashLayer.frame = layer.bounds
         flashLayer.backgroundColor = NSColor.white.cgColor

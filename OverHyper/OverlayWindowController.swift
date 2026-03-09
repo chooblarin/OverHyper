@@ -21,15 +21,29 @@ final class OverlayWindowController {
             recreateWindows()
         }
 
-        for surface in surfaces {
+        let contexts = surfaces.compactMap { surface -> OverlayRenderContext? in
             guard let layer = surface.hostView.layer else {
                 logger.warning("Missing host layer for overlay window")
-                continue
+                return nil
             }
 
             layer.frame = surface.hostView.bounds
-            effect.fire(on: layer, settings: settings)
+            return OverlayRenderContext(
+                screen: surface.screen,
+                hostView: surface.hostView,
+                layer: layer
+            )
         }
+
+        guard effect.prepareForRender(settings: settings) else {
+            return
+        }
+
+        for context in contexts {
+            effect.fire(in: context, settings: settings)
+        }
+
+        effect.finishRender(settings: settings)
     }
 
     @objc private func recreateWindows() {
@@ -87,16 +101,20 @@ final class OverlayWindowController {
         window.contentView = hostView
         window.orderFront(nil)
 
-        return OverlaySurface(window: window, hostView: hostView)
+        return OverlaySurface(screen: screen, window: window, hostView: hostView)
     }
 }
 
 private struct OverlaySurface {
+    let screen: NSScreen
     let window: NSWindow
     let hostView: OverlayHostView
 }
 
-private final class OverlayHostView: NSView {
+final class OverlayHostView: NSView {
+    private weak var shaderSubview: NSView?
+    private var shaderRequestID: UInt64 = 0
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
@@ -108,8 +126,51 @@ private final class OverlayHostView: NSView {
         return nil
     }
 
+    func beginShaderRequest() -> UInt64 {
+        shaderRequestID += 1
+        clearShaderSubview()
+        return shaderRequestID
+    }
+
+    func isCurrentShaderRequest(_ requestID: UInt64) -> Bool {
+        shaderRequestID == requestID
+    }
+
+    func installShaderSubview(_ view: NSView, requestID: UInt64) {
+        guard isCurrentShaderRequest(requestID) else {
+            return
+        }
+
+        view.frame = bounds
+        view.autoresizingMask = [.width, .height]
+        addSubview(view)
+        shaderSubview = view
+    }
+
+    func clearShaderSubview() {
+        shaderSubview?.removeFromSuperview()
+        shaderSubview = nil
+    }
+
+    func clearShaderSubview(ifMatching view: NSView) {
+        guard shaderSubview === view else {
+            return
+        }
+
+        clearShaderSubview()
+    }
+
+    func clearShaderSubview(ifMatching view: NSView, requestID: UInt64) {
+        guard isCurrentShaderRequest(requestID) else {
+            return
+        }
+
+        clearShaderSubview(ifMatching: view)
+    }
+
     override func layout() {
         super.layout()
         layer?.frame = bounds
+        shaderSubview?.frame = bounds
     }
 }

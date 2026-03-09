@@ -4,7 +4,8 @@ import QuartzCore
 final class ConfettiEffect: OverlayEffect {
     private static let particleImage = ConfettiEffect.makeParticleImage()
 
-    func fire(on layer: CALayer, settings: EffectSettings) {
+    func fire(in context: OverlayRenderContext, settings: EffectSettings) {
+        let layer = context.layer
         guard layer.bounds.width > 0, layer.bounds.height > 0 else {
             return
         }

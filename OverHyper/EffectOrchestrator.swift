@@ -7,6 +7,7 @@ final class EffectOrchestrator {
     private let settingsStore: EffectSettingsStore
     private let confettiEffect: OverlayEffect
     private let flashEffect: OverlayEffect
+    private let glitchEffect: OverlayEffect
     private let logger = Logger(
         subsystem: "OverHyper",
         category: "EffectOrchestrator"
@@ -16,12 +17,14 @@ final class EffectOrchestrator {
         overlayController: OverlayWindowController,
         settingsStore: EffectSettingsStore,
         confettiEffect: OverlayEffect,
-        flashEffect: OverlayEffect
+        flashEffect: OverlayEffect,
+        glitchEffect: OverlayEffect
     ) {
         self.overlayController = overlayController
         self.settingsStore = settingsStore
         self.confettiEffect = confettiEffect
         self.flashEffect = flashEffect
+        self.glitchEffect = glitchEffect
     }
 
     func fire(_ kind: EffectKind) {
@@ -31,6 +34,8 @@ final class EffectOrchestrator {
             effect = confettiEffect
         case .flash:
             effect = flashEffect
+        case .glitch:
+            effect = glitchEffect
         }
 
         overlayController.render(effect: effect, settings: settingsStore.settings)

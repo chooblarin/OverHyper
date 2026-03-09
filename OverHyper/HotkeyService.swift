@@ -44,7 +44,7 @@ final class HotkeyService {
         }
 
         let shortcut = MASShortcut(
-            keyCode: Int(kVK_ANSI_C),
+            keyCode: Int(kVK_ANSI_G),
             modifierFlags: [.control, .option, .command]
         )
 
@@ -53,7 +53,7 @@ final class HotkeyService {
         ]
 
         binder.registerDefaultShortcuts(shortcuts)
-        logger.debug("Registered default hotkey: control+option+command+C")
+        logger.debug("Registered default hotkey: control+option+command+G")
     }
 
     private func configureBindingOptions() {
