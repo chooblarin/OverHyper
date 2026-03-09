@@ -71,7 +71,7 @@ Environment setup and build steps are documented in `docs/LOCAL_SELF_USE.md`.
 ```text
 OverHyper/
 ├── App/
-│   ├── OverHyperApp.swift          # App entry point and Settings scene
+│   ├── OverHyperApp.swift          # App entry point and explicit settings window
 │   ├── AppDelegate.swift           # Status item lifecycle and menu actions
 │   └── AppRuntime.swift            # Runtime wiring (overlay/effects/hotkey)
 ├── Overlay/
