@@ -31,6 +31,6 @@ Use this checklist before external distribution.
 1. App launches as status bar app.
 2. Global hotkey works.
 3. Confetti and flash effects render across displays.
-4. Glitch captures the current display image and plays cleanly across displays.
+4. Glitch, CRT Burst, Shockwave, and Neon Edge capture the current display image and play cleanly across displays.
 5. Screen Recording permission request and denied-path behavior are understandable.
 6. Settings persistence works after relaunch.

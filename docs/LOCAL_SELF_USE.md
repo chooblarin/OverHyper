@@ -84,7 +84,7 @@ Optional:
 ### First launch notes
 
 - The app runs as a menu bar utility with the `⚡️` icon.
-- `Glitch` requires Screen Recording permission because it captures a single frame of the display with ScreenCaptureKit.
+- `Glitch`, `CRT Burst`, `Shockwave`, and `Neon Edge` require Screen Recording permission because they capture a single frame of the display with ScreenCaptureKit.
 - Default hotkey slots are `Control + Option + Command + 1 = Confetti`, `2 = Flash`, `3 = Glitch`.
 
 ## 5. Troubleshooting
@@ -124,7 +124,7 @@ Use the team ID that belongs to the selected certificate.
 
 Install/fix command line tools and rerun.
 
-### Glitch effect shows a permission alert
+### Shader effect shows a permission alert
 
 Allow Screen Recording for OverHyper in System Settings and relaunch if needed.
 The confetti and flash effects do not require Screen Recording permission.

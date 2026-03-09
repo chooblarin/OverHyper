@@ -1,11 +1,11 @@
 @MainActor
-final class GlitchEffect: ScreenShaderEffect {
+final class ShockwaveEffect: ScreenShaderEffect {
     init(screenCaptureService: ScreenCaptureService) {
         super.init(
-            style: .glitch,
-            duration: 1.0,
+            style: .shockwave,
+            duration: 1.2,
             screenCaptureService: screenCaptureService,
-            loggerCategory: "GlitchEffect"
+            loggerCategory: "ShockwaveEffect"
         )
     }
 

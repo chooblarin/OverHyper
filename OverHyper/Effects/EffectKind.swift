@@ -4,6 +4,9 @@ enum EffectKind: String, CaseIterable, Identifiable {
     case confetti
     case flash
     case glitch
+    case crtBurst
+    case shockwave
+    case neonEdge
 
     var id: String {
         rawValue
@@ -17,6 +20,12 @@ enum EffectKind: String, CaseIterable, Identifiable {
             return "Flash"
         case .glitch:
             return "Glitch"
+        case .crtBurst:
+            return "CRT Burst"
+        case .shockwave:
+            return "Shockwave"
+        case .neonEdge:
+            return "Neon Edge"
         }
     }
 }

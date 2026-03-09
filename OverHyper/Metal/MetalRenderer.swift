@@ -8,7 +8,7 @@ private struct TexturedVertex {
     let textureCoordinate: SIMD2<Float>
 }
 
-private struct GlitchUniforms {
+private struct ShaderUniforms {
     let viewportSize: SIMD2<Float>
     let elapsedTime: Float
     let totalDuration: Float
@@ -24,7 +24,12 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
 
     private var viewportSize = SIMD2<Float>(0, 0)
 
-    init?(device: MTLDevice, image: CGImage, duration: TimeInterval) {
+    init?(
+        device: MTLDevice,
+        image: CGImage,
+        style: ShaderEffectStyle,
+        duration: TimeInterval
+    ) {
         self.duration = Float(duration)
         let textureLoader = MTKTextureLoader(device: device)
 
@@ -67,7 +72,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
 
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = library.makeFunction(name: "glitchVertexShader")
-        descriptor.fragmentFunction = library.makeFunction(name: "glitchFragmentShader")
+        descriptor.fragmentFunction = library.makeFunction(name: style.fragmentFunctionName)
         descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
         descriptor.colorAttachments[0].isBlendingEnabled = true
         descriptor.colorAttachments[0].rgbBlendOperation = .add
@@ -108,7 +113,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
         }
 
         let elapsedTime = min(Float(CACurrentMediaTime() - startTime), duration)
-        var uniforms = GlitchUniforms(
+        var uniforms = ShaderUniforms(
             viewportSize: viewportSize,
             elapsedTime: elapsedTime,
             totalDuration: duration
@@ -119,7 +124,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
         encoder.setFragmentTexture(texture, index: 0)
         encoder.setFragmentBytes(
             &uniforms,
-            length: MemoryLayout<GlitchUniforms>.stride,
+            length: MemoryLayout<ShaderUniforms>.stride,
             index: 0
         )
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)

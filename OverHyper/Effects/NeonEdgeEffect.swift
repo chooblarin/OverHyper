@@ -1,11 +1,11 @@
 @MainActor
-final class GlitchEffect: ScreenShaderEffect {
+final class NeonEdgeEffect: ScreenShaderEffect {
     init(screenCaptureService: ScreenCaptureService) {
         super.init(
-            style: .glitch,
-            duration: 1.0,
+            style: .neonEdge,
+            duration: 0.95,
             screenCaptureService: screenCaptureService,
-            loggerCategory: "GlitchEffect"
+            loggerCategory: "NeonEdgeEffect"
         )
     }
 

@@ -9,12 +9,16 @@ final class AppRuntime {
 
     init(settingsStore: EffectSettingsStore) {
         let overlayController = OverlayWindowController()
+        let screenCaptureService = ScreenCaptureService()
         let orchestrator = EffectOrchestrator(
             overlayController: overlayController,
             settingsStore: settingsStore,
             confettiEffect: ConfettiEffect(),
             flashEffect: FlashEffect(),
-            glitchEffect: GlitchEffect()
+            glitchEffect: GlitchEffect(screenCaptureService: screenCaptureService),
+            crtBurstEffect: CRTBurstEffect(screenCaptureService: screenCaptureService),
+            shockwaveEffect: ShockwaveEffect(screenCaptureService: screenCaptureService),
+            neonEdgeEffect: NeonEdgeEffect(screenCaptureService: screenCaptureService)
         )
 
         effectOrchestrator = orchestrator

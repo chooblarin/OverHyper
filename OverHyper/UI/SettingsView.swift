@@ -3,16 +3,18 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settingsStore: EffectSettingsStore
     let onTestFire: (EffectKind) -> Void
+    private let effectColumns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
 
     var body: some View {
         Form {
             Section("Try Effects") {
-                HStack {
+                LazyVGrid(columns: effectColumns, spacing: 12) {
                     ForEach(EffectKind.allCases) { effect in
                         Button(effect.displayName) {
                             onTestFire(effect)
                         }
                         .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }

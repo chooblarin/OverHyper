@@ -1,11 +1,11 @@
 @MainActor
-final class GlitchEffect: ScreenShaderEffect {
+final class CRTBurstEffect: ScreenShaderEffect {
     init(screenCaptureService: ScreenCaptureService) {
         super.init(
-            style: .glitch,
-            duration: 1.0,
+            style: .crtBurst,
+            duration: 0.9,
             screenCaptureService: screenCaptureService,
-            loggerCategory: "GlitchEffect"
+            loggerCategory: "CRTBurstEffect"
         )
     }
 

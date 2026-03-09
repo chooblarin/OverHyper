@@ -77,7 +77,7 @@ final class ScreenCaptureService {
         let alert = NSAlert()
         alert.messageText = "Screen Recording permission is required"
         alert.informativeText = """
-        Allow Screen Recording for OverHyper in System Settings to use glitch effects.
+        Allow Screen Recording for OverHyper in System Settings to use shader effects.
         """
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")

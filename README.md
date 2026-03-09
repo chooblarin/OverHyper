@@ -1,7 +1,7 @@
 # OverHyper
 
 OverHyper is a macOS menu bar app for live talks.
-It renders stage effects such as confetti, flash, and glitch overlays across all connected displays.
+It renders stage effects such as confetti, flash, and shader-based overlays across all connected displays.
 
 ## Stack
 
@@ -19,11 +19,14 @@ It renders stage effects such as confetti, flash, and glitch overlays across all
 - Confetti effect
 - Flash effect
 - Glitch effect with frozen-frame shader animation
+- CRT Burst effect
+- Shockwave effect
+- Neon Edge effect
 - Preset global hotkey slots (`Control + Option + Command + 1...5`)
-- Screen Recording permission flow for glitch capture
+- Screen Recording permission flow for shader effect capture
 - Settings window with:
   - Effect test fire buttons
-  - Hotkey slot assignment for `Confetti` / `Flash` / `Glitch`
+  - Hotkey slot assignment for all available effects
 - Runtime screen/space change handling
 
 ## Run
@@ -62,6 +65,9 @@ Environment setup and build steps are documented in `docs/LOCAL_SELF_USE.md`.
   - `Fire Confetti`
   - `Fire Flash`
   - `Fire Glitch`
+  - `Fire CRT Burst`
+  - `Fire Shockwave`
+  - `Fire Neon Edge`
   - `Settings...`
   - `Quit OverHyper`
 - Preset hotkey defaults are `Control + Option + Command + 1 = Confetti`, `2 = Flash`, `3 = Glitch`.
@@ -82,10 +88,15 @@ OverHyper/
 │   ├── EffectSettings.swift
 │   ├── EffectSettingsStore.swift
 │   ├── OverlayEffect.swift
+│   ├── ScreenShaderEffect.swift
 │   ├── ConfettiEffect.swift
 │   ├── FlashEffect.swift
-│   └── GlitchEffect.swift
+│   ├── GlitchEffect.swift
+│   ├── CRTBurstEffect.swift
+│   ├── ShockwaveEffect.swift
+│   └── NeonEdgeEffect.swift
 ├── Metal/
+│   ├── ShaderEffectStyle.swift
 │   ├── MetalOverlayView.swift
 │   ├── MetalRenderer.swift
 │   └── Shaders.metal
@@ -109,9 +120,9 @@ OverHyper/
 
 1. Confetti appears on all connected displays.
 2. Flash appears when triggered.
-3. Glitch captures the current display image and plays for about one second.
-4. Glitch requests Screen Recording permission when needed and aborts cleanly if denied.
-5. Repeated triggers stack without crashing.
+3. Glitch, CRT Burst, Shockwave, and Neon Edge capture the current display image and play cleanly.
+4. Shader effects request Screen Recording permission when needed and abort cleanly if denied.
+5. Repeated shader triggers replace the prior shader surface without crashing.
 6. Preset hotkey slots trigger their assigned effects even when another app is focused.
 7. Changing displays or spaces does not break effects.
 8. Settings are persisted after app restart.

@@ -9,12 +9,22 @@ final class MetalOverlayView: MTKView {
         false
     }
 
-    init?(frame frameRect: NSRect, image: CGImage, duration: TimeInterval) {
+    init?(
+        frame frameRect: NSRect,
+        image: CGImage,
+        style: ShaderEffectStyle,
+        duration: TimeInterval
+    ) {
         guard let device = MTLCreateSystemDefaultDevice() else {
             return nil
         }
 
-        guard let renderer = MetalRenderer(device: device, image: image, duration: duration) else {
+        guard let renderer = MetalRenderer(
+            device: device,
+            image: image,
+            style: style,
+            duration: duration
+        ) else {
             return nil
         }
 

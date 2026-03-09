@@ -52,6 +52,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(fireGlitch),
             keyEquivalent: ""
         ))
+        menu.addItem(makeMenuItem(
+            title: "Fire CRT Burst",
+            action: #selector(fireCRTBurst),
+            keyEquivalent: ""
+        ))
+        menu.addItem(makeMenuItem(
+            title: "Fire Shockwave",
+            action: #selector(fireShockwave),
+            keyEquivalent: ""
+        ))
+        menu.addItem(makeMenuItem(
+            title: "Fire Neon Edge",
+            action: #selector(fireNeonEdge),
+            keyEquivalent: ""
+        ))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(makeMenuItem(
             title: "Settings...",
@@ -115,6 +130,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func fireGlitch() {
         fire(.glitch)
+    }
+
+    @objc private func fireCRTBurst() {
+        fire(.crtBurst)
+    }
+
+    @objc private func fireShockwave() {
+        fire(.shockwave)
+    }
+
+    @objc private func fireNeonEdge() {
+        fire(.neonEdge)
     }
 
     @objc private func openSettings() {
