@@ -1,6 +1,7 @@
 # Swift Style Checklist (Google Swift Style Guide)
 
 Use this checklist in code review for newly added or edited Swift files.
+The same baseline is mirrored in the repository's `.swiftlint.yml`.
 
 1. Line length is 100 columns or less (except allowed import/documentation cases).
 2. No semicolons.

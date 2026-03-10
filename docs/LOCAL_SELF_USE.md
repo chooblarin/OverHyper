@@ -10,6 +10,7 @@ It targets local app launch on your own Mac and does not include notarization.
 1. Xcode is installed.
 2. Apple Development certificate is available in your login keychain.
 3. Homebrew is available.
+4. SwiftLint is installed via Homebrew.
 
 ### 1.2 Ruby And Bundler
 
@@ -29,6 +30,12 @@ Run from project root:
 ```bash
 bundle config set --local path vendor/bundle
 bundle install
+```
+
+Install SwiftLint:
+
+```bash
+brew install swiftlint
 ```
 
 ## 2. fastlane Env File Setup
@@ -123,6 +130,14 @@ Use the team ID that belongs to the selected certificate.
 ### Xcode CLI missing
 
 Install/fix command line tools and rerun.
+
+### SwiftLint is missing
+
+Install it with:
+
+```bash
+brew install swiftlint
+```
 
 ### Shader effect shows a permission alert
 

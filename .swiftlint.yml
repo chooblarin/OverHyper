@@ -1,0 +1,49 @@
+included:
+  - OverHyper
+
+excluded:
+  - Vendor
+  - dist
+  - vendor
+  - .bundle
+
+reporter: xcode
+
+opt_in_rules:
+  - force_cast
+  - force_unwrapping
+
+line_length:
+  warning: 100
+  error: 140
+  ignores_comments: false
+  ignores_urls: true
+  ignores_function_declarations: false
+  ignores_interpolated_strings: false
+
+file_length:
+  warning: 600
+  error: 800
+
+type_body_length:
+  warning: 300
+  error: 400
+
+function_body_length:
+  warning: 50
+  error: 80
+
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - id
+    - x
+    - y
+    - z
+
+force_cast:
+  severity: warning
+
+force_unwrapping:
+  severity: warning

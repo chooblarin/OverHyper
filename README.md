@@ -33,7 +33,19 @@ It renders stage effects such as confetti, flash, and shader-based overlays acro
 
 1. Open `OverHyper.xcodeproj` in Xcode.
 2. Select the `OverHyper` scheme.
-3. Build and run.
+3. Install SwiftLint with `brew install swiftlint`.
+4. Build and run.
+
+## Lint
+
+SwiftLint is wired into the `OverHyper` target as an Xcode Run Script build phase.
+Initial rollout is warning-first, so violations are surfaced in build logs without failing the build.
+
+Run it manually from the project root:
+
+```bash
+scripts/swiftlint.sh
+```
 
 ## Build For Self Use
 
@@ -134,3 +146,5 @@ OverHyper/
 
 Implementation follows Google Swift Style Guide for new and edited files:
 <https://google.github.io/swift/>
+
+The practical baseline is enforced by `.swiftlint.yml`.
