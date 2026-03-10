@@ -89,7 +89,7 @@ private enum Colors {
         NSColor.systemTeal,
         NSColor.systemOrange,
         NSColor.systemMint,
-        NSColor.systemBlue,
+        NSColor.systemBlue
     ]
 }
 

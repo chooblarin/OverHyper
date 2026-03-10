@@ -21,7 +21,7 @@ final class FlashEffect: OverlayEffect {
         animation.duration = 0.34
         animation.timingFunctions = [
             CAMediaTimingFunction(name: .easeOut),
-            CAMediaTimingFunction(name: .easeIn),
+            CAMediaTimingFunction(name: .easeIn)
         ]
 
         flashLayer.add(animation, forKey: "overhyper.flash.opacity")

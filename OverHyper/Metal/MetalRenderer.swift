@@ -44,7 +44,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
             TexturedVertex(position: [-1, 1], textureCoordinate: [0, 0]),
             TexturedVertex(position: [-1, 1], textureCoordinate: [0, 0]),
             TexturedVertex(position: [1, -1], textureCoordinate: [1, 1]),
-            TexturedVertex(position: [1, 1], textureCoordinate: [1, 0]),
+            TexturedVertex(position: [1, 1], textureCoordinate: [1, 0])
         ]
 
         guard let vertexBuffer = device.makeBuffer(
@@ -59,7 +59,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
             texture = try textureLoader.newTexture(
                 cgImage: image,
                 options: [
-                    MTKTextureLoader.Option.SRGB: NSNumber(booleanLiteral: false),
+                    MTKTextureLoader.Option.SRGB: NSNumber(value: false)
                 ]
             )
         } catch {

@@ -96,7 +96,7 @@ final class OverlayWindowController {
             .canJoinAllSpaces,
             .fullScreenAuxiliary,
             .stationary,
-            .ignoresCycle,
+            .ignoresCycle
         ]
         window.contentView = hostView
         window.orderFront(nil)
