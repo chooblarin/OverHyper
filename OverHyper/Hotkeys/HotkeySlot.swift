@@ -1,6 +1,6 @@
+import AppKit
 import Carbon.HIToolbox
 import Foundation
-import MASShortcut
 
 enum HotkeySlotID: String, CaseIterable, Identifiable {
     case slot1
@@ -28,25 +28,25 @@ enum HotkeySlotID: String, CaseIterable, Identifiable {
         }
     }
 
-    var shortcut: MASShortcut {
-        MASShortcut(
+    var shortcut: Hotkey {
+        Hotkey(
             keyCode: keyCode,
             modifierFlags: [.control, .option, .command]
         )
     }
 
-    private var keyCode: Int {
+    private var keyCode: UInt32 {
         switch self {
         case .slot1:
-            return Int(kVK_ANSI_1)
+            return UInt32(kVK_ANSI_1)
         case .slot2:
-            return Int(kVK_ANSI_2)
+            return UInt32(kVK_ANSI_2)
         case .slot3:
-            return Int(kVK_ANSI_3)
+            return UInt32(kVK_ANSI_3)
         case .slot4:
-            return Int(kVK_ANSI_4)
+            return UInt32(kVK_ANSI_4)
         case .slot5:
-            return Int(kVK_ANSI_5)
+            return UInt32(kVK_ANSI_5)
         }
     }
 }

@@ -22,7 +22,10 @@ final class AppRuntime {
         )
 
         effectOrchestrator = orchestrator
-        hotkeyService = HotkeyService(settingsStore: settingsStore) { [weak orchestrator] effect in
+        hotkeyService = HotkeyService(
+            settingsStore: settingsStore,
+            registrar: GlobalHotkeyRegistrar()
+        ) { [weak orchestrator] effect in
             orchestrator?.fire(effect)
         }
     }

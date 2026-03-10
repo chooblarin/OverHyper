@@ -1,22 +1,21 @@
 import AppKit
-import MASShortcut
 import OSLog
 
 @MainActor
 final class HotkeyService {
     private let settingsStore: EffectSettingsStore
-    private let shortcutMonitor: MASShortcutMonitor
+    private let registrar: GlobalHotkeyRegistrar
     private let onTrigger: (EffectKind) -> Void
     private let logger = Logger(subsystem: "OverHyper", category: "Hotkey")
-    private var registeredShortcuts: [HotkeySlotID: MASShortcut] = [:]
+    private var registrationTokens: [HotkeySlotID: HotkeyRegistrationToken] = [:]
 
     init(
         settingsStore: EffectSettingsStore,
-        shortcutMonitor: MASShortcutMonitor = MASShortcutMonitor.shared(),
+        registrar: GlobalHotkeyRegistrar,
         onTrigger: @escaping (EffectKind) -> Void
     ) {
         self.settingsStore = settingsStore
-        self.shortcutMonitor = shortcutMonitor
+        self.registrar = registrar
         self.onTrigger = onTrigger
     }
 
@@ -26,10 +25,10 @@ final class HotkeyService {
     }
 
     func stop() {
-        for shortcut in registeredShortcuts.values {
-            shortcutMonitor.unregisterShortcut(shortcut)
+        for token in registrationTokens.values {
+            registrar.unregister(token)
         }
-        registeredShortcuts.removeAll()
+        registrationTokens.removeAll()
     }
 
     private func registerShortcuts() {
@@ -37,7 +36,7 @@ final class HotkeyService {
 
         for slotID in HotkeySlotID.allCases {
             let shortcut = slotID.shortcut
-            let didRegister = shortcutMonitor.register(shortcut) { [weak self] in
+            guard let token = registrar.register(shortcut, action: { [weak self] in
                 guard let self else {
                     return
                 }
@@ -47,14 +46,12 @@ final class HotkeyService {
                 }
 
                 self.onTrigger(effect)
-            }
-
-            guard didRegister else {
+            }) else {
                 logger.error("Failed to register hotkey for \(slotID.rawValue, privacy: .public)")
                 continue
             }
 
-            registeredShortcuts[slotID] = shortcut
+            registrationTokens[slotID] = token
         }
     }
 }

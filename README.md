@@ -8,7 +8,7 @@ It renders stage effects such as confetti, flash, and shader-based overlays acro
 - Overlay windows: AppKit (`NSWindow`, `NSStatusItem`)
 - Settings UI: SwiftUI
 - Effects: Core Animation (`CAEmitterLayer`) and Metal (`MTKView`, shaders)
-- Global shortcut: MASShortcut
+- Global shortcut: in-house Carbon hotkey registrar
 - Persistence: UserDefaults
 - Screen capture: ScreenCaptureKit
 
@@ -102,9 +102,12 @@ OverHyper/
 │   └── Shaders.metal
 ├── Capture/
 │   └── ScreenCaptureService.swift
+├── Hotkeys/
+│   ├── Hotkey.swift
+│   ├── GlobalHotkeyRegistrar.swift
+│   ├── HotkeyService.swift
+│   └── HotkeySlot.swift
 └── UI/
-    ├── HotkeyService.swift
-    ├── HotkeySlot.swift
     └── SettingsView.swift
 ```
 
