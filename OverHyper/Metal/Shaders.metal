@@ -59,6 +59,158 @@ float edgeStrength(
     return horizontal + vertical + (centerBias * 0.5);
 }
 
+constant float kRainFlowSpeed = 0.75;
+constant float2 kRainDropStretch = float2(6.0, 1.0);
+constant float kRainSecondaryLayerScale = 1.85;
+constant float kRainStaticDropScale = 37.0;
+constant float kRainStrength = 0.80;
+constant float kRainStaticBoost = 1.8;
+constant float kRainTrailStrength = 0.84;
+constant float kRainRefractionBase = 0.08;
+constant float kRainRefractionTrailBoost = 0.04;
+constant float kRainIntroPortion = 0.32;
+constant float kRainOutroStartPortion = 0.60;
+
+float smoothstepRain(float edge0, float edge1, float value) {
+    float delta = edge1 - edge0;
+    if (abs(delta) < 1e-5) {
+        delta = delta >= 0.0 ? 1e-5 : -1e-5;
+    }
+    float t = saturate((value - edge0) / delta);
+    return t * t * (3.0 - (2.0 * t));
+}
+
+float3 hash31(float value) {
+    float3 p3 = fract(float3(value) * float3(0.1031, 0.11369, 0.13787));
+    p3 += dot(p3, p3.yzx + 19.19);
+    return fract(float3(
+        (p3.x + p3.y) * p3.z,
+        (p3.x + p3.z) * p3.y,
+        (p3.y + p3.z) * p3.x
+    ));
+}
+
+float sawRain(float blend, float time) {
+    return smoothstepRain(0.0, blend, time) * smoothstepRain(1.0, blend, time);
+}
+
+float rainEnvelope(constant ShaderUniforms &uniforms) {
+    float intro = smoothstep(
+        0.0,
+        uniforms.totalDuration * kRainIntroPortion,
+        uniforms.elapsedTime
+    );
+    float outro = 1.0 - smoothstep(
+        uniforms.totalDuration * kRainOutroStartPortion,
+        uniforms.totalDuration,
+        uniforms.elapsedTime
+    );
+    return intro * outro;
+}
+
+float2 rainFieldUV(float2 uv, float aspect) {
+    return float2(
+        (uv.x - 0.5) * 2.0 * aspect,
+        (0.5 - uv.y) * 2.0
+    );
+}
+
+float2 rainDropLayer(float2 uv, float time) {
+    float2 originalUV = uv;
+
+    uv.y += time * kRainFlowSpeed;
+    float2 grid = kRainDropStretch * 2.0;
+    float2 cellID = floor(uv * grid);
+
+    float columnShift = hash11(cellID.x);
+    uv.y += columnShift;
+
+    cellID = floor(uv * grid);
+    float3 noise = hash31((cellID.x * 35.2) + (cellID.y * 2376.1));
+    float2 local = fract(uv * grid) - float2(0.5, 0.0);
+
+    float offsetX = noise.x - 0.5;
+    float waveY = originalUV.y * 20.0;
+    float wiggle = sin(waveY + sin(waveY));
+    offsetX += wiggle * (0.5 - abs(offsetX)) * (noise.z - 0.5);
+    offsetX *= 0.7;
+
+    float cycle = fract(time + noise.z);
+    float offsetY = (sawRain(0.85, cycle) - 0.5) * 0.9 + 0.5;
+    float2 dropCenter = float2(offsetX, offsetY);
+
+    float distanceToDrop = length((local - dropCenter) * kRainDropStretch.yx);
+    float mainDrop = smoothstepRain(0.4, 0.0, distanceToDrop);
+
+    float trailRadius = sqrt(smoothstepRain(1.0, offsetY, local.y));
+    float columnDistance = abs(local.x - offsetX);
+    float trail = smoothstepRain(
+        0.23 * trailRadius,
+        0.15 * trailRadius * trailRadius,
+        columnDistance
+    );
+    float trailFront = smoothstepRain(-0.02, 0.02, local.y - offsetY);
+    trail *= trailFront * trailRadius * trailRadius * kRainTrailStrength;
+
+    float dropletsY = originalUV.y;
+    float trailColumn = smoothstepRain(0.2 * trailRadius, 0.0, columnDistance);
+    float droplets = max(
+        0.0,
+        (sin(dropletsY * (1.0 - dropletsY) * 120.0) - local.y)
+    ) * trailColumn * trailFront * noise.z;
+    dropletsY = fract(dropletsY * 10.0) + (local.y - 0.5);
+    float dropletDistance = length(local - float2(offsetX, dropletsY));
+    droplets = smoothstepRain(0.3, 0.0, dropletDistance);
+
+    float combinedMask = mainDrop + (droplets * trailRadius * trailFront);
+    return float2(combinedMask, trail);
+}
+
+float rainStaticDrops(float2 uv, float time) {
+    uv *= kRainStaticDropScale;
+
+    float2 cellID = floor(uv);
+    float2 local = fract(uv) - 0.5;
+    float3 noise = hash31((cellID.x * 107.45) + (cellID.y * 3543.654));
+    float2 point = (noise.xy - 0.5) * 0.7;
+    float distanceToPoint = length(local - point);
+
+    float fade = sawRain(0.025, fract(time + noise.z));
+    return smoothstepRain(0.3, 0.0, distanceToPoint) * fract(noise.z * 10.0) * fade;
+}
+
+float2 rainDrops(
+    float2 uv,
+    float time,
+    float staticAmount,
+    float layer1Amount,
+    float layer2Amount
+) {
+    float staticMask = rainStaticDrops(uv, time) * staticAmount;
+    float2 layer1 = rainDropLayer(uv, time) * layer1Amount;
+    float2 layer2 = rainDropLayer(uv * kRainSecondaryLayerScale, time) * layer2Amount;
+
+    float coverage = staticMask + layer1.x + layer2.x;
+    coverage = smoothstepRain(0.3, 1.0, coverage);
+
+    return float2(coverage, max(layer1.y * staticAmount, layer2.y * layer1Amount));
+}
+
+float3 rainTrailBlur(
+    texture2d<float> sourceTexture,
+    float2 uv,
+    float trailMask,
+    float2 texelSize
+) {
+    float3 baseSample = sampleSource(sourceTexture, uv);
+    float3 blurSample = baseSample * 0.32;
+    blurSample += sampleSource(sourceTexture, uv + float2(0.0, texelSize.y * 2.0)) * 0.23;
+    blurSample += sampleSource(sourceTexture, uv - float2(0.0, texelSize.y * 2.0)) * 0.23;
+    blurSample += sampleSource(sourceTexture, uv + float2(0.0, texelSize.y * 4.5)) * 0.11;
+    blurSample += sampleSource(sourceTexture, uv - float2(0.0, texelSize.y * 4.5)) * 0.11;
+    return mix(baseSample, blurSample, saturate(trailMask));
+}
+
 constant float kCrackedGlassCellJitter = 0.65;
 constant float kCrackedGlassAngularSegments = 9.0;
 
@@ -548,4 +700,66 @@ fragment float4 neonEdgeFragmentShader(
     finalColor += edgeColor * (luminance(baseColor) * 0.08 * edgeAmount);
 
     return float4(saturate(mix(baseColor, finalColor, edgeAmount)), 1.0);
+}
+
+fragment float4 rainGlassFragmentShader(
+    VertexOut in [[stage_in]],
+    texture2d<float> sourceTexture [[texture(0)]],
+    constant ShaderUniforms &uniforms [[buffer(0)]]
+) {
+    float2 uv = in.textureCoordinate;
+    float3 baseColor = sampleSource(sourceTexture, uv);
+    float envelope = rainEnvelope(uniforms);
+
+    if (envelope <= 0.0001) {
+        return float4(baseColor, 1.0);
+    }
+
+    float aspect = uniforms.viewportSize.x / max(uniforms.viewportSize.y, 1.0);
+    float2 texelSize = 1.0 / max(uniforms.viewportSize, float2(1.0, 1.0));
+    float2 uvCentered = rainFieldUV(uv, aspect);
+
+    float rainAmount = kRainStrength * envelope;
+    float staticAmount = smoothstep(-0.5, 1.0, rainAmount) * kRainStaticBoost;
+    float layer1Amount = smoothstep(0.25, 0.75, rainAmount);
+    float layer2Amount = smoothstep(0.0, 0.5, rainAmount);
+
+    float2 dropData = rainDrops(
+        uvCentered,
+        uniforms.elapsedTime,
+        staticAmount,
+        layer1Amount,
+        layer2Amount
+    );
+
+    float2 stepX = float2(texelSize.x * 2.0 * aspect, 0.0);
+    float2 stepY = float2(0.0, texelSize.y * 2.0);
+    float coverageX = rainDrops(
+        uvCentered + stepX,
+        uniforms.elapsedTime,
+        staticAmount,
+        layer1Amount,
+        layer2Amount
+    ).x;
+    float coverageY = rainDrops(
+        uvCentered - stepY,
+        uniforms.elapsedTime,
+        staticAmount,
+        layer1Amount,
+        layer2Amount
+    ).x;
+    float2 normal = float2(coverageX - dropData.x, coverageY - dropData.x);
+
+    float2 sampleOffset = float2(normal.x / max(aspect, 0.0001), -normal.y)
+        * (kRainRefractionBase + (dropData.y * kRainRefractionTrailBoost))
+        * envelope;
+    float2 sampleUV = clamp(uv + sampleOffset, 0.0, 1.0);
+
+    float3 refractedColor = sampleSource(sourceTexture, sampleUV);
+    float trailMask = saturate(dropData.y * envelope);
+    float3 blurredTrail = rainTrailBlur(sourceTexture, sampleUV, trailMask, texelSize);
+    float3 finalColor = mix(refractedColor, blurredTrail, trailMask * 0.55);
+    finalColor *= 1.0 - (trailMask * 0.05);
+
+    return float4(saturate(finalColor), 1.0);
 }

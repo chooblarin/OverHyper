@@ -19,7 +19,8 @@ final class AppRuntime {
             crtBurstEffect: CRTBurstEffect(screenCaptureService: screenCaptureService),
             shockwaveEffect: ShockwaveEffect(screenCaptureService: screenCaptureService),
             crackedGlassEffect: CrackedGlassEffect(screenCaptureService: screenCaptureService),
-            neonEdgeEffect: NeonEdgeEffect(screenCaptureService: screenCaptureService)
+            neonEdgeEffect: NeonEdgeEffect(screenCaptureService: screenCaptureService),
+            rainGlassEffect: RainGlassEffect(screenCaptureService: screenCaptureService)
         )
 
         effectOrchestrator = orchestrator

@@ -36,42 +36,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func makeStatusMenu() -> NSMenu {
         let menu = NSMenu()
+        let effectItems: [(title: String, action: Selector)] = [
+            ("Fire Confetti", #selector(fireConfetti)),
+            ("Fire Flash", #selector(fireFlash)),
+            ("Fire Glitch", #selector(fireGlitch)),
+            ("Fire CRT Burst", #selector(fireCRTBurst)),
+            ("Fire Shockwave", #selector(fireShockwave)),
+            ("Fire Cracked Glass", #selector(fireCrackedGlass)),
+            ("Fire Neon Edge", #selector(fireNeonEdge)),
+            ("Fire Rain Glass", #selector(fireRainGlass))
+        ]
 
-        menu.addItem(makeMenuItem(
-            title: "Fire Confetti",
-            action: #selector(fireConfetti),
-            keyEquivalent: ""
-        ))
-        menu.addItem(makeMenuItem(
-            title: "Fire Flash",
-            action: #selector(fireFlash),
-            keyEquivalent: ""
-        ))
-        menu.addItem(makeMenuItem(
-            title: "Fire Glitch",
-            action: #selector(fireGlitch),
-            keyEquivalent: ""
-        ))
-        menu.addItem(makeMenuItem(
-            title: "Fire CRT Burst",
-            action: #selector(fireCRTBurst),
-            keyEquivalent: ""
-        ))
-        menu.addItem(makeMenuItem(
-            title: "Fire Shockwave",
-            action: #selector(fireShockwave),
-            keyEquivalent: ""
-        ))
-        menu.addItem(makeMenuItem(
-            title: "Fire Cracked Glass",
-            action: #selector(fireCrackedGlass),
-            keyEquivalent: ""
-        ))
-        menu.addItem(makeMenuItem(
-            title: "Fire Neon Edge",
-            action: #selector(fireNeonEdge),
-            keyEquivalent: ""
-        ))
+        for item in effectItems {
+            menu.addItem(makeMenuItem(
+                title: item.title,
+                action: item.action,
+                keyEquivalent: ""
+            ))
+        }
+
         menu.addItem(NSMenuItem.separator())
         menu.addItem(makeMenuItem(
             title: "Settings...",
@@ -151,6 +134,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func fireNeonEdge() {
         fire(.neonEdge)
+    }
+
+    @objc private func fireRainGlass() {
+        fire(.rainGlass)
     }
 
     @objc private func openSettings() {
