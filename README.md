@@ -23,6 +23,7 @@ It renders stage effects such as confetti, flash, and shader-based overlays acro
 - Shockwave effect
 - Cracked Glass effect
 - Neon Edge effect
+- Rain Glass effect
 - Preset global hotkey slots (`Control + Option + Command + 1...5`)
 - Screen Recording permission flow for shader effect capture
 - Settings window with:
@@ -82,6 +83,7 @@ Environment setup and build steps are documented in `docs/LOCAL_SELF_USE.md`.
   - `Fire Shockwave`
   - `Fire Cracked Glass`
   - `Fire Neon Edge`
+  - `Fire Rain Glass`
   - `Settings...`
   - `Quit OverHyper`
 - Preset hotkey defaults are `Control + Option + Command + 1 = Confetti`, `2 = Flash`, `3 = Glitch`.
@@ -109,7 +111,8 @@ OverHyper/
 │   ├── CRTBurstEffect.swift
 │   ├── ShockwaveEffect.swift
 │   ├── CrackedGlassEffect.swift
-│   └── NeonEdgeEffect.swift
+│   ├── NeonEdgeEffect.swift
+│   └── RainGlassEffect.swift
 ├── Metal/
 │   ├── ShaderEffectStyle.swift
 │   ├── MetalOverlayView.swift
@@ -138,7 +141,7 @@ OverHyper/
 
 1. Confetti appears on all connected displays.
 2. Flash appears when triggered.
-3. Glitch, CRT Burst, Shockwave, Cracked Glass, and Neon Edge capture the current display image and play cleanly.
+3. Glitch, CRT Burst, Shockwave, Cracked Glass, Neon Edge, and Rain Glass capture the current display image and play cleanly.
 4. Shader effects request Screen Recording permission when needed and abort cleanly if denied.
 5. Repeated shader triggers replace the prior shader surface without crashing.
 6. Preset hotkey slots trigger their assigned effects even when another app is focused.

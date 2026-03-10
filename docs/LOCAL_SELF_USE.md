@@ -91,7 +91,7 @@ Optional:
 ### First launch notes
 
 - The app runs as a menu bar utility with the `⚡️` icon.
-- `Glitch`, `CRT Burst`, `Shockwave`, and `Neon Edge` require Screen Recording permission because they capture a single frame of the display with ScreenCaptureKit.
+- `Glitch`, `CRT Burst`, `Shockwave`, `Cracked Glass`, `Neon Edge`, and `Rain Glass` require Screen Recording permission because they capture a single frame of the display with ScreenCaptureKit.
 - Default hotkey slots are `Control + Option + Command + 1 = Confetti`, `2 = Flash`, `3 = Glitch`.
 
 ## 5. Troubleshooting
