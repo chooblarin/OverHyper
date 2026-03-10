@@ -38,7 +38,7 @@ final class MetalOverlayView: MTKView {
         framebufferOnly = false
         enableSetNeedsDisplay = false
         isPaused = false
-        preferredFramesPerSecond = 60
+        preferredFramesPerSecond = style.preferredFramesPerSecond
         autoResizeDrawable = true
 
         delegate = renderer

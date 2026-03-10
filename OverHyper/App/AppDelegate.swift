@@ -63,6 +63,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: ""
         ))
         menu.addItem(makeMenuItem(
+            title: "Fire Cracked Glass",
+            action: #selector(fireCrackedGlass),
+            keyEquivalent: ""
+        ))
+        menu.addItem(makeMenuItem(
             title: "Fire Neon Edge",
             action: #selector(fireNeonEdge),
             keyEquivalent: ""
@@ -138,6 +143,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func fireShockwave() {
         fire(.shockwave)
+    }
+
+    @objc private func fireCrackedGlass() {
+        fire(.crackedGlass)
     }
 
     @objc private func fireNeonEdge() {

@@ -2,6 +2,7 @@ enum ShaderEffectStyle {
     case glitch
     case crtBurst
     case shockwave
+    case crackedGlass
     case neonEdge
 
     var fragmentFunctionName: String {
@@ -12,8 +13,17 @@ enum ShaderEffectStyle {
             return "crtBurstFragmentShader"
         case .shockwave:
             return "shockwaveFragmentShader"
+        case .crackedGlass:
+            return "crackedGlassFragmentShader"
         case .neonEdge:
             return "neonEdgeFragmentShader"
+        }
+    }
+
+    var preferredFramesPerSecond: Int {
+        switch self {
+        case .glitch, .crtBurst, .shockwave, .crackedGlass, .neonEdge:
+            return 60
         }
     }
 }

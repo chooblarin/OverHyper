@@ -10,6 +10,7 @@ final class EffectOrchestrator {
     private let glitchEffect: OverlayEffect
     private let crtBurstEffect: OverlayEffect
     private let shockwaveEffect: OverlayEffect
+    private let crackedGlassEffect: OverlayEffect
     private let neonEdgeEffect: OverlayEffect
     private let logger = Logger(
         subsystem: "OverHyper",
@@ -24,6 +25,7 @@ final class EffectOrchestrator {
         glitchEffect: OverlayEffect,
         crtBurstEffect: OverlayEffect,
         shockwaveEffect: OverlayEffect,
+        crackedGlassEffect: OverlayEffect,
         neonEdgeEffect: OverlayEffect
     ) {
         self.overlayController = overlayController
@@ -33,6 +35,7 @@ final class EffectOrchestrator {
         self.glitchEffect = glitchEffect
         self.crtBurstEffect = crtBurstEffect
         self.shockwaveEffect = shockwaveEffect
+        self.crackedGlassEffect = crackedGlassEffect
         self.neonEdgeEffect = neonEdgeEffect
     }
 
@@ -49,6 +52,8 @@ final class EffectOrchestrator {
             effect = crtBurstEffect
         case .shockwave:
             effect = shockwaveEffect
+        case .crackedGlass:
+            effect = crackedGlassEffect
         case .neonEdge:
             effect = neonEdgeEffect
         }

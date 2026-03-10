@@ -18,6 +18,7 @@ final class AppRuntime {
             glitchEffect: GlitchEffect(screenCaptureService: screenCaptureService),
             crtBurstEffect: CRTBurstEffect(screenCaptureService: screenCaptureService),
             shockwaveEffect: ShockwaveEffect(screenCaptureService: screenCaptureService),
+            crackedGlassEffect: CrackedGlassEffect(screenCaptureService: screenCaptureService),
             neonEdgeEffect: NeonEdgeEffect(screenCaptureService: screenCaptureService)
         )
 
