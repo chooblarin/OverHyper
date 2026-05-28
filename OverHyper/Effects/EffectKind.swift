@@ -9,6 +9,7 @@ enum EffectKind: String, CaseIterable, Identifiable {
     case crackedGlass
     case neonEdge
     case rainGlass
+    case lightning
 
     var id: String {
         rawValue
@@ -32,6 +33,8 @@ enum EffectKind: String, CaseIterable, Identifiable {
             return "Neon Edge"
         case .rainGlass:
             return "Rain Glass"
+        case .lightning:
+            return "Lightning"
         }
     }
 }

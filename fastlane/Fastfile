@@ -14,6 +14,7 @@ platform :mac do
 
     verify_env_values
     verify_xcode_cli
+    verify_metal_toolchain
     verify_signing_identity
   end
 
@@ -47,6 +48,34 @@ platform :mac do
   rescue StandardError => error
     UI.user_error!(
       "Xcode command line tools are not available: #{error.message}"
+    )
+  end
+
+  private_lane :verify_metal_toolchain do
+    component_info = sh(
+      "xcodebuild -showComponent MetalToolchain",
+      log: false
+    )
+
+    unless component_info.include?("Status: installed")
+      UI.user_error!(
+        "Metal Toolchain is not installed. " \
+        "Install it with: xcodebuild -downloadComponent MetalToolchain"
+      )
+    end
+
+    toolchain_identifier = component_info[/Toolchain Identifier:\s*(\S+)/, 1]
+    unless toolchain_identifier
+      UI.user_error!(
+        "Metal Toolchain is installed, but its toolchain identifier was not found."
+      )
+    end
+
+    Actions.lane_context[:OVERHYPER_METAL_TOOLCHAIN_IDENTIFIER] = toolchain_identifier
+  rescue StandardError => error
+    UI.user_error!(
+      "Metal Toolchain is not available: #{error.message}. " \
+      "Install it with: xcodebuild -downloadComponent MetalToolchain"
     )
   end
 
@@ -86,6 +115,10 @@ platform :mac do
     packages_path = "/tmp/OverHyperPackages"
     app_product_path = "#{derived_data_path}/Build/Products/Release/OverHyper.app"
     escaped_identity = Shellwords.escape(ENV.fetch("OVERHYPER_CODE_SIGN_IDENTITY"))
+    metal_toolchain_identifier = Actions.lane_context.fetch(
+      :OVERHYPER_METAL_TOOLCHAIN_IDENTIFIER
+    )
+    escaped_metal_toolchain = Shellwords.escape(metal_toolchain_identifier)
 
     clean_dist
 
@@ -100,6 +133,7 @@ platform :mac do
       derived_data_path: derived_data_path,
       cloned_source_packages_path: packages_path,
       xcargs: [
+        "-toolchain #{escaped_metal_toolchain}",
         "DEVELOPMENT_TEAM=#{ENV.fetch('OVERHYPER_TEAM_ID')}",
         "CODE_SIGN_IDENTITY=#{escaped_identity}",
         "PRODUCT_BUNDLE_IDENTIFIER=#{ENV.fetch('OVERHYPER_APP_IDENTIFIER')}",

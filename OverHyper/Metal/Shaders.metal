@@ -17,6 +17,31 @@ struct ShaderUniforms {
     float totalDuration;
 };
 
+struct LightningRibbonVertex {
+    float3 position;
+    float2 textureCoordinate;
+    float along;
+    float padding;
+};
+
+struct LightningRibbonInstance {
+    float4x4 modelMatrix;
+    float4 coreColor;
+    float4 edgeColor;
+    float4 parameters;
+};
+
+struct LightningRibbonVertexOut {
+    float4 position [[position]];
+    float2 textureCoordinate;
+    float along;
+    float threshold;
+    float opacity;
+    float textureOffset;
+    float4 coreColor;
+    float4 edgeColor;
+};
+
 float hash11(float value) {
     return fract(sin(value * 127.1) * 43758.5453123);
 }
@@ -420,6 +445,69 @@ vertex VertexOut glitchVertexShader(
     out.position = float4(vertices[vertexID].position, 0.0, 1.0);
     out.textureCoordinate = vertices[vertexID].textureCoordinate;
     return out;
+}
+
+vertex LightningRibbonVertexOut lightningRibbonVertexShader(
+    const device LightningRibbonVertex *vertices [[buffer(0)]],
+    const device LightningRibbonInstance *instances [[buffer(1)]],
+    constant ShaderUniforms &uniforms [[buffer(2)]],
+    uint vertexID [[vertex_id]],
+    uint instanceID [[instance_id]]
+) {
+    LightningRibbonVertex ribbonVertex = vertices[vertexID];
+    LightningRibbonInstance instance = instances[instanceID];
+    float4 world = instance.modelMatrix * float4(ribbonVertex.position, 1.0);
+    float2 translation = instance.modelMatrix[3].xy;
+    float aspect = uniforms.viewportSize.x / max(uniforms.viewportSize.y, 1.0);
+    float localX = (world.x - translation.x) / max(aspect, 0.0001);
+    float localY = world.y - translation.y;
+
+    LightningRibbonVertexOut out;
+    out.position = float4(translation.x + localX, translation.y + localY, world.z, 1.0);
+    out.textureCoordinate = ribbonVertex.textureCoordinate;
+    out.along = ribbonVertex.along;
+    out.threshold = instance.parameters.x;
+    out.opacity = instance.parameters.y;
+    out.textureOffset = instance.parameters.z;
+    out.coreColor = instance.coreColor;
+    out.edgeColor = instance.edgeColor;
+    return out;
+}
+
+fragment float4 lightningRibbonFragmentShader(
+    LightningRibbonVertexOut in [[stage_in]],
+    texture2d<float> maskTexture [[texture(0)]],
+    constant ShaderUniforms &uniforms [[buffer(0)]]
+) {
+    constexpr sampler maskSampler(address::repeat, filter::linear);
+    float2 scrolledUV = float2(
+        in.textureCoordinate.x + in.textureOffset + (uniforms.elapsedTime * 0.22),
+        in.textureCoordinate.y
+    );
+    float dist = maskTexture.sample(maskSampler, scrolledUV).r;
+    float edgeValue = dist - (1.0 - in.threshold);
+    float tipFadeLength = 0.18;
+    float tipMask = smoothstep(0.0, tipFadeLength, in.along)
+        * smoothstep(0.0, tipFadeLength, 1.0 - in.along);
+    float lineWidth = 0.24 * mix(0.12, 1.0, tipMask);
+    float alphaThreshold = 0.4 - lineWidth;
+    float edgeWidth = 0.10;
+    float edgeSoftness = 0.04;
+    float colorThreshold = alphaThreshold + edgeWidth;
+    float colorMix = smoothstep(colorThreshold, colorThreshold + edgeSoftness, edgeValue);
+    float alpha = smoothstep(alphaThreshold, alphaThreshold + edgeSoftness, edgeValue);
+    alpha *= pow(tipMask, 1.4);
+
+    float outerGlow = smoothstep(alphaThreshold - 0.10, alphaThreshold + 0.08, edgeValue);
+    outerGlow *= pow(tipMask, 0.8) * 0.28;
+
+    float3 edgeColor = in.edgeColor.rgb;
+    float3 coreColor = in.coreColor.rgb;
+    float3 finalColor = mix(edgeColor, coreColor, colorMix);
+    finalColor += coreColor * outerGlow;
+
+    float finalAlpha = saturate((alpha * in.opacity * max(in.coreColor.a, in.edgeColor.a)) + (outerGlow * in.opacity));
+    return float4(saturate(finalColor), finalAlpha);
 }
 
 fragment float4 glitchFragmentShader(

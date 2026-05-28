@@ -13,6 +13,7 @@ final class EffectOrchestrator {
     private let crackedGlassEffect: OverlayEffect
     private let neonEdgeEffect: OverlayEffect
     private let rainGlassEffect: OverlayEffect
+    private let lightningEffect: OverlayEffect
     private let logger = Logger(
         subsystem: "OverHyper",
         category: "EffectOrchestrator"
@@ -28,7 +29,8 @@ final class EffectOrchestrator {
         shockwaveEffect: OverlayEffect,
         crackedGlassEffect: OverlayEffect,
         neonEdgeEffect: OverlayEffect,
-        rainGlassEffect: OverlayEffect
+        rainGlassEffect: OverlayEffect,
+        lightningEffect: OverlayEffect
     ) {
         self.overlayController = overlayController
         self.settingsStore = settingsStore
@@ -40,6 +42,7 @@ final class EffectOrchestrator {
         self.crackedGlassEffect = crackedGlassEffect
         self.neonEdgeEffect = neonEdgeEffect
         self.rainGlassEffect = rainGlassEffect
+        self.lightningEffect = lightningEffect
     }
 
     func fire(_ kind: EffectKind) {
@@ -61,6 +64,8 @@ final class EffectOrchestrator {
             effect = neonEdgeEffect
         case .rainGlass:
             effect = rainGlassEffect
+        case .lightning:
+            effect = lightningEffect
         }
 
         overlayController.render(effect: effect, settings: settingsStore.settings)
