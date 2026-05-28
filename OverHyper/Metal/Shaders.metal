@@ -537,7 +537,7 @@ vertex LightningRibbonVertexOut lightningRibbonVertexShader(
     float localX = (world.x - translation.x) / max(aspect, 0.0001);
     float localY = world.y - translation.y;
     float bloomAmount = instance.parameters.w;
-    float bloomScale = 1.0 + (bloomAmount * 0.28);
+    float bloomScale = 1.0 + (bloomAmount * 0.035);
     float lightningTime = uniforms.elapsedTime * 0.5;
     float2 pathWarp = lightningPathWarp(
         ribbonVertex.along,
@@ -545,7 +545,7 @@ vertex LightningRibbonVertexOut lightningRibbonVertexShader(
         lightningTime,
         instance.parameters.z
     );
-    float warpScale = 1.0 / (1.0 + (bloomAmount * 0.45));
+    float warpScale = 1.0 / (1.0 + (bloomAmount * 0.10));
     localX += pathWarp.x * warpScale;
     localY += pathWarp.y * warpScale;
 
@@ -603,20 +603,16 @@ fragment float4 lightningRibbonFragmentShader(
     alpha *= pow(tipMask, 1.4);
 
     if (in.bloomAmount > 0.001) {
-        float glowAmount = saturate(in.bloomAmount * 0.42);
-        float neonReach = mix(0.30, 0.68, glowAmount);
-        float neonCore = smoothstep(0.20, 1.0, colorMix) * alpha;
-        float neonHalo = smoothstep(alphaThreshold - neonReach, alphaThreshold + 0.12, edgeValue);
-        float noisyHalo = pow(electricField, 1.25)
-            * smoothstep(alphaThreshold - (neonReach * 1.12), alphaThreshold + 0.18, edgeValue)
-            * pow(tipMask, 0.55);
-        float bloomEnergy = ((neonCore * 0.95) + (neonHalo * 0.24) + (noisyHalo * 0.58))
-            * in.opacity
-            * mix(0.66, 1.06, glowAmount);
-        float3 neonTint = float3(1.0, 0.98, 0.58);
-        float3 bloomColor = mix(in.coreColor.rgb, neonTint, 0.52);
-        bloomColor *= 1.34 + (in.bloomAmount * 0.38);
-        return float4(bloomColor * bloomEnergy, saturate(bloomEnergy * 0.48));
+        float coreMask = alpha * smoothstep(0.22, 0.96, colorMix);
+        float nearMask = smoothstep(alphaThreshold - 0.09, alphaThreshold + 0.07, edgeValue)
+            * pow(tipMask, 0.78);
+        float filamentMask = pow(electricField, 1.40)
+            * smoothstep(alphaThreshold - 0.12, alphaThreshold + 0.10, edgeValue)
+            * pow(tipMask, 0.72);
+        float mask = ((coreMask * 1.42) + (nearMask * 0.44) + (filamentMask * 0.34))
+            * in.opacity;
+        float3 glowColor = mix(in.coreColor.rgb, float3(1.0, 0.94, 0.36), 0.58);
+        return float4(glowColor * mask, saturate(mask * 0.58));
     }
 
     float3 edgeColor = in.edgeColor.rgb;
@@ -627,6 +623,50 @@ fragment float4 lightningRibbonFragmentShader(
     finalColor += float3(1.0, 0.97, 0.48) * pow(colorMix, 2.6) * alpha * 0.38;
     float finalAlpha = saturate(alpha * in.opacity * max(in.coreColor.a, in.edgeColor.a));
     return float4(saturate(finalColor), finalAlpha);
+}
+
+fragment float4 lightningGlowCompositeFragmentShader(
+    VertexOut in [[stage_in]],
+    texture2d<float> glowTexture [[texture(0)]],
+    constant ShaderUniforms &uniforms [[buffer(0)]]
+) {
+    constexpr sampler glowSampler(address::clamp_to_edge, filter::linear);
+    float2 uv = in.textureCoordinate;
+    float2 texelSize = 1.0 / max(uniforms.viewportSize, float2(1.0, 1.0));
+    float3 center = glowTexture.sample(glowSampler, uv).rgb;
+
+    float3 tight = center;
+    tight += glowTexture.sample(glowSampler, uv + (texelSize * float2(2.0, 0.0))).rgb;
+    tight += glowTexture.sample(glowSampler, uv + (texelSize * float2(-2.0, 0.0))).rgb;
+    tight += glowTexture.sample(glowSampler, uv + (texelSize * float2(0.0, 2.0))).rgb;
+    tight += glowTexture.sample(glowSampler, uv + (texelSize * float2(0.0, -2.0))).rgb;
+    tight *= 0.20;
+
+    float3 mid = float3(0.0);
+    mid += glowTexture.sample(glowSampler, uv + (texelSize * float2(5.0, 3.0))).rgb;
+    mid += glowTexture.sample(glowSampler, uv + (texelSize * float2(-5.0, 3.0))).rgb;
+    mid += glowTexture.sample(glowSampler, uv + (texelSize * float2(5.0, -3.0))).rgb;
+    mid += glowTexture.sample(glowSampler, uv + (texelSize * float2(-5.0, -3.0))).rgb;
+    mid += glowTexture.sample(glowSampler, uv + (texelSize * float2(0.0, 7.0))).rgb;
+    mid += glowTexture.sample(glowSampler, uv + (texelSize * float2(0.0, -7.0))).rgb;
+    mid *= 0.1667;
+
+    float3 wide = float3(0.0);
+    wide += glowTexture.sample(glowSampler, uv + (texelSize * float2(11.0, 0.0))).rgb;
+    wide += glowTexture.sample(glowSampler, uv + (texelSize * float2(-11.0, 0.0))).rgb;
+    wide += glowTexture.sample(glowSampler, uv + (texelSize * float2(0.0, 11.0))).rgb;
+    wide += glowTexture.sample(glowSampler, uv + (texelSize * float2(0.0, -11.0))).rgb;
+    wide += glowTexture.sample(glowSampler, uv + (texelSize * float2(9.0, 9.0))).rgb;
+    wide += glowTexture.sample(glowSampler, uv + (texelSize * float2(-9.0, 9.0))).rgb;
+    wide += glowTexture.sample(glowSampler, uv + (texelSize * float2(9.0, -9.0))).rgb;
+    wide += glowTexture.sample(glowSampler, uv + (texelSize * float2(-9.0, -9.0))).rgb;
+    wide *= 0.125;
+
+    float pulse = 0.88 + (0.12 * sin((uniforms.elapsedTime * 9.0) + (uv.x * 21.0) - (uv.y * 17.0)));
+    float3 neonLift = float3(0.04, 0.16, 0.18) * luminance(tight + mid);
+    float3 glow = ((tight * 0.86) + (mid * 0.62) + (wide * 0.38) + neonLift) * pulse;
+    float glowAlpha = saturate(luminance(glow) * 0.72);
+    return float4(saturate(glow * 1.18), glowAlpha);
 }
 
 fragment float4 glitchFragmentShader(

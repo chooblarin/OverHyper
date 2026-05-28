@@ -11,6 +11,11 @@ private struct LightningVertex {
     let padding: Float
 }
 
+private struct LightningQuadVertex {
+    let position: SIMD2<Float>
+    let textureCoordinate: SIMD2<Float>
+}
+
 private struct LightningInstance {
     let modelMatrix: simd_float4x4
     let coreColor: SIMD4<Float>
@@ -71,14 +76,19 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
     private let duration: Float
     private let commandQueue: MTLCommandQueue
     private let basePipelineState: MTLRenderPipelineState
-    private let glowPipelineState: MTLRenderPipelineState
+    private let glowMaskPipelineState: MTLRenderPipelineState
+    private let glowCompositePipelineState: MTLRenderPipelineState
     private let maskTexture: MTLTexture
     private let meshes: [LightningMesh]
     private let spawns: [LightningSpawn]
+    private let quadVertexBuffer: MTLBuffer
     private let startTime = CACurrentMediaTime()
 
     private var viewportSize = SIMD2<Float>(0, 0)
+    private var glowTexture: MTLTexture?
+    private var glowTextureSize = SIMD2<Int32>(0, 0)
 
+    // swiftlint:disable:next function_body_length
     init?(device: MTLDevice, duration: TimeInterval) {
         self.duration = Float(duration)
 
@@ -95,23 +105,35 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
             let basePipelineState = Self.makePipelineState(
                 device: device,
                 library: library,
+                pixelFormat: .bgra8Unorm,
                 isAdditive: false
             ),
-            let glowPipelineState = Self.makePipelineState(
+            let glowMaskPipelineState = Self.makePipelineState(
                 device: device,
                 library: library,
+                pixelFormat: .rgba16Float,
                 isAdditive: true
+            ),
+            let glowCompositePipelineState = Self.makeGlowCompositePipelineState(
+                device: device,
+                library: library
             )
         else {
             return nil
         }
         self.basePipelineState = basePipelineState
-        self.glowPipelineState = glowPipelineState
+        self.glowMaskPipelineState = glowMaskPipelineState
+        self.glowCompositePipelineState = glowCompositePipelineState
 
         guard let maskTexture = Self.makeMaskTexture(device: device) else {
             return nil
         }
         self.maskTexture = maskTexture
+
+        guard let quadVertexBuffer = Self.makeQuadVertexBuffer(device: device) else {
+            return nil
+        }
+        self.quadVertexBuffer = quadVertexBuffer
 
         let meshVertices = Self.makeRibbonMeshes()
         var meshes: [LightningMesh] = []
@@ -143,8 +165,7 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
         guard
             let renderPassDescriptor = view.currentRenderPassDescriptor,
             let drawable = view.currentDrawable,
-            let commandBuffer = commandQueue.makeCommandBuffer(),
-            let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
+            let commandBuffer = commandQueue.makeCommandBuffer()
         else {
             return
         }
@@ -157,6 +178,15 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
         )
         let groupedInstances = activeInstances(at: elapsedTime)
 
+        renderGlowMask(groupedInstances, uniforms: &uniforms, in: view, using: commandBuffer)
+
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(
+            descriptor: renderPassDescriptor
+        ) else {
+            return
+        }
+
+        encodeGlowComposite(uniforms: &uniforms, using: encoder)
         encodeInstances(groupedInstances, uniforms: &uniforms, in: view, using: encoder)
 
         encoder.endEncoding()
@@ -189,13 +219,6 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
             }
 
             draw(
-                instances.map { $0.glowPass(amount: 1.45) },
-                meshIndex: meshIndex,
-                pipelineState: glowPipelineState,
-                in: view,
-                using: encoder
-            )
-            draw(
                 instances,
                 meshIndex: meshIndex,
                 pipelineState: basePipelineState,
@@ -203,6 +226,80 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
                 using: encoder
             )
         }
+    }
+
+    private func renderGlowMask(
+        _ groupedInstances: [[LightningInstance]],
+        uniforms: inout LightningUniforms,
+        in view: MTKView,
+        using commandBuffer: MTLCommandBuffer
+    ) {
+        guard let texture = glowTexture(for: view) else {
+            return
+        }
+
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = texture
+        descriptor.colorAttachments[0].loadAction = .clear
+        descriptor.colorAttachments[0].storeAction = .store
+        descriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: 0,
+            green: 0,
+            blue: 0,
+            alpha: 0
+        )
+
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return
+        }
+
+        encoder.setFragmentTexture(maskTexture, index: 0)
+        encoder.setVertexBytes(
+            &uniforms,
+            length: MemoryLayout<LightningUniforms>.stride,
+            index: 2
+        )
+        encoder.setFragmentBytes(
+            &uniforms,
+            length: MemoryLayout<LightningUniforms>.stride,
+            index: 0
+        )
+
+        for meshIndex in meshes.indices {
+            let instances = groupedInstances[meshIndex]
+            guard !instances.isEmpty else {
+                continue
+            }
+
+            draw(
+                instances.map { $0.glowPass(amount: 1.0) },
+                meshIndex: meshIndex,
+                pipelineState: glowMaskPipelineState,
+                in: view,
+                using: encoder
+            )
+        }
+
+        encoder.endEncoding()
+    }
+
+    private func encodeGlowComposite(
+        uniforms: inout LightningUniforms,
+        using encoder: MTLRenderCommandEncoder
+    ) {
+        guard let glowTexture else {
+            return
+        }
+
+        encoder.setRenderPipelineState(glowCompositePipelineState)
+        encoder.setVertexBuffer(quadVertexBuffer, offset: 0, index: 0)
+        encoder.setFragmentTexture(glowTexture, index: 0)
+        encoder.setFragmentBytes(
+            &uniforms,
+            length: MemoryLayout<LightningUniforms>.stride,
+            index: 0
+        )
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
     }
 
     private func draw(
@@ -278,18 +375,42 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
 
         return grouped
     }
+
+    private func glowTexture(for view: MTKView) -> MTLTexture? {
+        let width = max(Int(view.drawableSize.width), 1)
+        let height = max(Int(view.drawableSize.height), 1)
+        let textureSize = SIMD2<Int32>(Int32(width), Int32(height))
+
+        if glowTextureSize == textureSize, let glowTexture {
+            return glowTexture
+        }
+
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba16Float,
+            width: width,
+            height: height,
+            mipmapped: false
+        )
+        descriptor.usage = [.renderTarget, .shaderRead]
+        descriptor.storageMode = .private
+
+        glowTexture = view.device?.makeTexture(descriptor: descriptor)
+        glowTextureSize = textureSize
+        return glowTexture
+    }
 }
 
 private extension LightningMetalRenderer {
     private static func makePipelineState(
         device: MTLDevice,
         library: MTLLibrary,
+        pixelFormat: MTLPixelFormat,
         isAdditive: Bool
     ) -> MTLRenderPipelineState? {
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = library.makeFunction(name: "lightningRibbonVertexShader")
         descriptor.fragmentFunction = library.makeFunction(name: "lightningRibbonFragmentShader")
-        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        descriptor.colorAttachments[0].pixelFormat = pixelFormat
         descriptor.colorAttachments[0].isBlendingEnabled = true
         descriptor.colorAttachments[0].rgbBlendOperation = .add
         descriptor.colorAttachments[0].alphaBlendOperation = .add
@@ -300,6 +421,42 @@ private extension LightningMetalRenderer {
         descriptor.colorAttachments[0].destinationAlphaBlendFactor = destinationBlend
 
         return try? device.makeRenderPipelineState(descriptor: descriptor)
+    }
+
+    private static func makeGlowCompositePipelineState(
+        device: MTLDevice,
+        library: MTLLibrary
+    ) -> MTLRenderPipelineState? {
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.vertexFunction = library.makeFunction(name: "glitchVertexShader")
+        descriptor.fragmentFunction = library.makeFunction(
+            name: "lightningGlowCompositeFragmentShader"
+        )
+        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        descriptor.colorAttachments[0].isBlendingEnabled = true
+        descriptor.colorAttachments[0].rgbBlendOperation = .add
+        descriptor.colorAttachments[0].alphaBlendOperation = .add
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = .one
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .one
+
+        return try? device.makeRenderPipelineState(descriptor: descriptor)
+    }
+
+    private static func makeQuadVertexBuffer(device: MTLDevice) -> MTLBuffer? {
+        let vertices: [LightningQuadVertex] = [
+            LightningQuadVertex(position: [-1, -1], textureCoordinate: [0, 1]),
+            LightningQuadVertex(position: [1, -1], textureCoordinate: [1, 1]),
+            LightningQuadVertex(position: [-1, 1], textureCoordinate: [0, 0]),
+            LightningQuadVertex(position: [-1, 1], textureCoordinate: [0, 0]),
+            LightningQuadVertex(position: [1, -1], textureCoordinate: [1, 1]),
+            LightningQuadVertex(position: [1, 1], textureCoordinate: [1, 0])
+        ]
+        return device.makeBuffer(
+            bytes: vertices,
+            length: MemoryLayout<LightningQuadVertex>.stride * vertices.count
+        )
     }
 
     private static func makeMaskTexture(device: MTLDevice) -> MTLTexture? {
@@ -512,8 +669,8 @@ private extension LightningMetalRenderer {
     // swiftlint:disable:next function_body_length
     private static func makeSpawns(duration: Float) -> [LightningSpawn] {
         var generator = SeededGenerator(seed: 0x5F17ECA1)
-        let count = 19
-        let centerCount = 3
+        let count = 24
+        let centerCount = 4
         let corePalette: [SIMD4<Float>] = [
             color(hex: 0xFF481B, alpha: 0.95),
             color(hex: 0xDFFE38, alpha: 0.90),
@@ -522,15 +679,16 @@ private extension LightningMetalRenderer {
         let edgeColor = color(hex: 0x1C1D1E, alpha: 0.70)
 
         return (0..<count).map { index in
-            let burstCount = 5
+            let burstCount = 6
             let isCentral = index >= count - centerCount
+            let isLongStrike = !isCentral && (index % 7 == 3 || generator.nextUnit() > 0.88)
             let spawnTime: Float
             if index < burstCount {
-                spawnTime = Float(index) * 0.18
+                spawnTime = Float(index) * 0.15
             } else {
-                spawnTime = 0.20 + (generator.nextUnit() * duration * 0.66)
+                spawnTime = 0.16 + (generator.nextUnit() * duration * 0.70)
             }
-            let lifetime = 0.48 + generator.nextUnit() * 0.48
+            let lifetime = 0.62 + generator.nextUnit() * 0.58
             let meshIndex = min(
                 Int(generator.nextUnit() * Float(meshVariantCount)),
                 meshVariantCount - 1
@@ -546,6 +704,14 @@ private extension LightningMetalRenderer {
                     ? 0.82 + generator.nextUnit() * 0.36
                     : 0.90 + generator.nextUnit() * 0.52
             )
+            let scaleX: Float
+            if isCentral {
+                scaleX = scale * 1.22
+            } else if isLongStrike {
+                scaleX = scale * (2.10 + generator.nextUnit() * 0.55)
+            } else {
+                scaleX = scale * (1.14 + generator.nextUnit() * 0.22)
+            }
             let rotation = SIMD3<Float>(
                 (generator.nextUnit() - 0.5) * 0.8,
                 (generator.nextUnit() - 0.5) * 0.8,
@@ -555,7 +721,7 @@ private extension LightningMetalRenderer {
                 * rotationZMatrix(rotation.z)
                 * rotationYMatrix(rotation.y)
                 * rotationXMatrix(rotation.x)
-                * scaleMatrix(SIMD3<Float>(scale, scaleY, scale))
+                * scaleMatrix(SIMD3<Float>(scaleX, scaleY, scale))
 
             return LightningSpawn(
                 spawnTime: spawnTime,

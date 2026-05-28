@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 final class LightningEffect: OverlayEffect {
     private enum Constants {
-        static let duration: TimeInterval = 1.6
+        static let duration: TimeInterval = 2.1
     }
 
     func fire(in context: OverlayRenderContext, settings: EffectSettings) {
