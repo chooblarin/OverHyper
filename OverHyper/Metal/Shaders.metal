@@ -38,6 +38,7 @@ struct LightningRibbonVertexOut {
     float threshold;
     float opacity;
     float textureOffset;
+    float bloomAmount;
     float4 coreColor;
     float4 edgeColor;
 };
@@ -57,6 +58,80 @@ float3 sampleSource(texture2d<float> sourceTexture, float2 uv) {
 
 float luminance(float3 color) {
     return dot(color, float3(0.299, 0.587, 0.114));
+}
+
+float lightningToneMap(float energy, float radialFalloff) {
+    float safeEnergy = max(energy, 0.001);
+    float compressed = 25.6 / (min(safeEnergy, 13.0) + (164.0 / safeEnergy));
+    return saturate((compressed * 1.42) - (radialFalloff * 0.28));
+}
+
+float lightningElectricField(float2 uv, float time, float seed) {
+    float2 initialUV = (uv - 0.5) * float2(0.58, 0.32);
+    float2 u = initialUV;
+    float2 v = float2(1.0, 1.0);
+    float energy = 0.0;
+    float amplitude = 0.50;
+    float t = time + (seed * 6.28318);
+
+    for (int step = 0; step < 14; step++) {
+        float index = float(step) + 1.0;
+        t += 1.0;
+        amplitude += 0.03;
+        float denominator = max(0.5 - dot(u, u), 0.08);
+        float2 singular = (1.5 * u / denominator) - (9.0 * u.yx) + t;
+        v = cos(t - (7.0 * u * pow(amplitude, index))) - (5.0 * u);
+
+        float distanceWave = length((1.0 + (index * dot(v, v))) * sin(singular));
+        float filament = 1.0 / max(distanceWave, 0.055);
+        float colorPulse = 1.0 + cos((index * 0.65) + t);
+        energy += filament * (0.66 + (0.34 * colorPulse)) / (1.0 + (index * 0.24));
+
+        float angle = index + (t * 0.02) - (seed * 11.0);
+        float sine = sin(angle);
+        float cosine = cos(angle);
+        float2x2 rotation = float2x2(cosine, sine, -sine, cosine);
+        u = rotation * u;
+
+        float2 electricPush = cos((100.0 * u.yx) + t);
+        u += tanh(40.0 * dot(u, u) * electricPush) * 0.005;
+        u += 0.16 * amplitude * u;
+        float drift = cos((4.0 / exp(min(energy * energy, 64.0) * 0.01)) + t) * 0.003;
+        u += float2(drift);
+    }
+
+    return lightningToneMap(energy * 0.72, dot(initialUV - u, initialUV - u));
+}
+
+float2 lightningPathWarp(float along, float row, float time, float seed) {
+    float2 u = float2((along - 0.5) * 0.62, (row - 0.5) * 0.32);
+    float2 warp = float2(0.0);
+    float amplitude = 0.50;
+    float t = time + (seed * 6.28318);
+
+    for (int step = 0; step < 7; step++) {
+        float index = float(step) + 1.0;
+        t += 1.0;
+        amplitude += 0.03;
+        float angle = index + (t * 0.02) - (seed * 11.0);
+        float sine = sin(angle);
+        float cosine = cos(angle);
+        float2x2 rotation = float2x2(cosine, sine, -sine, cosine);
+
+        u = rotation * u;
+        float2 electricPush = cos((100.0 * u.yx) + t);
+        u += tanh(40.0 * dot(u, u) * electricPush) * 0.005;
+        u += 0.12 * amplitude * u;
+
+        float2 fold = cos(t - (7.0 * u * pow(amplitude, index))) - (5.0 * u);
+        warp += float2(
+            sin((fold.x * 2.0) + t),
+            cos((fold.y * 2.8) - t)
+        ) / (index * 2.10);
+    }
+
+    float tipDamping = smoothstep(0.0, 0.18, along) * smoothstep(0.0, 0.18, 1.0 - along);
+    return warp * tipDamping * 0.060;
 }
 
 float2 barrelDistortion(float2 uv, float amount) {
@@ -461,14 +536,32 @@ vertex LightningRibbonVertexOut lightningRibbonVertexShader(
     float aspect = uniforms.viewportSize.x / max(uniforms.viewportSize.y, 1.0);
     float localX = (world.x - translation.x) / max(aspect, 0.0001);
     float localY = world.y - translation.y;
+    float bloomAmount = instance.parameters.w;
+    float bloomScale = 1.0 + (bloomAmount * 0.28);
+    float lightningTime = uniforms.elapsedTime * 0.5;
+    float2 pathWarp = lightningPathWarp(
+        ribbonVertex.along,
+        ribbonVertex.textureCoordinate.y,
+        lightningTime,
+        instance.parameters.z
+    );
+    float warpScale = 1.0 / (1.0 + (bloomAmount * 0.45));
+    localX += pathWarp.x * warpScale;
+    localY += pathWarp.y * warpScale;
 
     LightningRibbonVertexOut out;
-    out.position = float4(translation.x + localX, translation.y + localY, world.z, 1.0);
+    out.position = float4(
+        translation.x + (localX * bloomScale),
+        translation.y + (localY * bloomScale),
+        world.z,
+        1.0
+    );
     out.textureCoordinate = ribbonVertex.textureCoordinate;
     out.along = ribbonVertex.along;
     out.threshold = instance.parameters.x;
     out.opacity = instance.parameters.y;
     out.textureOffset = instance.parameters.z;
+    out.bloomAmount = bloomAmount;
     out.coreColor = instance.coreColor;
     out.edgeColor = instance.edgeColor;
     return out;
@@ -480,16 +573,27 @@ fragment float4 lightningRibbonFragmentShader(
     constant ShaderUniforms &uniforms [[buffer(0)]]
 ) {
     constexpr sampler maskSampler(address::repeat, filter::linear);
+    float lightningTime = uniforms.elapsedTime * 0.5;
+    float uvJitter = sin((lightningTime * 5.8) + (in.textureOffset * 17.0)) * 0.026;
+    uvJitter += sin((lightningTime * 13.7) + (in.textureOffset * 29.0)) * 0.010;
     float2 scrolledUV = float2(
-        in.textureCoordinate.x + in.textureOffset + (uniforms.elapsedTime * 0.22),
+        in.textureCoordinate.x + in.textureOffset + (lightningTime * 0.38) + uvJitter,
         in.textureCoordinate.y
     );
     float dist = maskTexture.sample(maskSampler, scrolledUV).r;
     float edgeValue = dist - (1.0 - in.threshold);
+    float2 fieldUV = float2(fract(scrolledUV.x * 1.16), in.textureCoordinate.y);
+    float electricField = lightningElectricField(
+        fieldUV,
+        lightningTime + (in.textureOffset * 2.0),
+        in.textureOffset
+    );
+    float fieldCore = smoothstep(0.34, 0.92, electricField);
+    edgeValue += fieldCore * 0.085;
     float tipFadeLength = 0.18;
     float tipMask = smoothstep(0.0, tipFadeLength, in.along)
         * smoothstep(0.0, tipFadeLength, 1.0 - in.along);
-    float lineWidth = 0.24 * mix(0.12, 1.0, tipMask);
+    float lineWidth = 0.30 * mix(0.16, 1.0, tipMask);
     float alphaThreshold = 0.4 - lineWidth;
     float edgeWidth = 0.10;
     float edgeSoftness = 0.04;
@@ -498,15 +602,30 @@ fragment float4 lightningRibbonFragmentShader(
     float alpha = smoothstep(alphaThreshold, alphaThreshold + edgeSoftness, edgeValue);
     alpha *= pow(tipMask, 1.4);
 
-    float outerGlow = smoothstep(alphaThreshold - 0.10, alphaThreshold + 0.08, edgeValue);
-    outerGlow *= pow(tipMask, 0.8) * 0.28;
+    if (in.bloomAmount > 0.001) {
+        float glowAmount = saturate(in.bloomAmount * 0.42);
+        float neonReach = mix(0.30, 0.68, glowAmount);
+        float neonCore = smoothstep(0.20, 1.0, colorMix) * alpha;
+        float neonHalo = smoothstep(alphaThreshold - neonReach, alphaThreshold + 0.12, edgeValue);
+        float noisyHalo = pow(electricField, 1.25)
+            * smoothstep(alphaThreshold - (neonReach * 1.12), alphaThreshold + 0.18, edgeValue)
+            * pow(tipMask, 0.55);
+        float bloomEnergy = ((neonCore * 0.95) + (neonHalo * 0.24) + (noisyHalo * 0.58))
+            * in.opacity
+            * mix(0.66, 1.06, glowAmount);
+        float3 neonTint = float3(1.0, 0.98, 0.58);
+        float3 bloomColor = mix(in.coreColor.rgb, neonTint, 0.52);
+        bloomColor *= 1.34 + (in.bloomAmount * 0.38);
+        return float4(bloomColor * bloomEnergy, saturate(bloomEnergy * 0.48));
+    }
 
     float3 edgeColor = in.edgeColor.rgb;
     float3 coreColor = in.coreColor.rgb;
     float3 finalColor = mix(edgeColor, coreColor, colorMix);
-    finalColor += coreColor * outerGlow;
-
-    float finalAlpha = saturate((alpha * in.opacity * max(in.coreColor.a, in.edgeColor.a)) + (outerGlow * in.opacity));
+    float electricSpark = pow(electricField, 1.35) * alpha * in.opacity;
+    finalColor += coreColor * electricSpark * 0.66;
+    finalColor += float3(1.0, 0.97, 0.48) * pow(colorMix, 2.6) * alpha * 0.38;
+    float finalAlpha = saturate(alpha * in.opacity * max(in.coreColor.a, in.edgeColor.a));
     return float4(saturate(finalColor), finalAlpha);
 }
 
