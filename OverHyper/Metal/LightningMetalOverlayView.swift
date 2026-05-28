@@ -28,7 +28,7 @@ final class LightningMetalOverlayView: MTKView {
         layer?.isOpaque = false
         layer?.backgroundColor = NSColor.clear.cgColor
         (layer as? CAMetalLayer)?.isOpaque = false
-        framebufferOnly = false
+        framebufferOnly = true
         enableSetNeedsDisplay = false
         isPaused = false
         preferredFramesPerSecond = 60

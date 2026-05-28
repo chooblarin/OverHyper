@@ -35,7 +35,7 @@ final class MetalOverlayView: MTKView {
         autoresizingMask = [.width, .height]
         clearColor = MTLClearColorMake(0, 0, 0, 0)
         colorPixelFormat = .bgra8Unorm
-        framebufferOnly = false
+        framebufferOnly = true
         enableSetNeedsDisplay = false
         isPaused = false
         preferredFramesPerSecond = style.preferredFramesPerSecond

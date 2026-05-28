@@ -59,7 +59,10 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
             texture = try textureLoader.newTexture(
                 cgImage: image,
                 options: [
-                    MTKTextureLoader.Option.SRGB: NSNumber(value: false)
+                    MTKTextureLoader.Option.SRGB: NSNumber(value: false),
+                    MTKTextureLoader.Option.textureStorageMode: NSNumber(
+                        value: MTLStorageMode.private.rawValue
+                    )
                 ]
             )
         } catch {

@@ -222,7 +222,6 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
                 instances,
                 meshIndex: meshIndex,
                 pipelineState: basePipelineState,
-                in: view,
                 using: encoder
             )
         }
@@ -275,7 +274,6 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
                 instances.map { $0.glowPass(amount: 1.0) },
                 meshIndex: meshIndex,
                 pipelineState: glowMaskPipelineState,
-                in: view,
                 using: encoder
             )
         }
@@ -306,30 +304,28 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
         _ instances: [LightningInstance],
         meshIndex: Int,
         pipelineState: MTLRenderPipelineState,
-        in view: MTKView,
         using encoder: MTLRenderCommandEncoder
     ) {
         guard !instances.isEmpty else {
             return
         }
 
-        guard let instanceBuffer = view.device?.makeBuffer(
-            bytes: instances,
-            length: MemoryLayout<LightningInstance>.stride * instances.count
-        ) else {
-            return
-        }
-
         let mesh = meshes[meshIndex]
         encoder.setRenderPipelineState(pipelineState)
         encoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
-        encoder.setVertexBuffer(instanceBuffer, offset: 0, index: 1)
-        encoder.drawPrimitives(
-            type: .triangle,
-            vertexStart: 0,
-            vertexCount: mesh.vertexCount,
-            instanceCount: instances.count
-        )
+        instances.withUnsafeBytes { instanceBytes in
+            guard let baseAddress = instanceBytes.baseAddress else {
+                return
+            }
+
+            encoder.setVertexBytes(baseAddress, length: instanceBytes.count, index: 1)
+            encoder.drawPrimitives(
+                type: .triangle,
+                vertexStart: 0,
+                vertexCount: mesh.vertexCount,
+                instanceCount: instances.count
+            )
+        }
     }
 
     private func activeInstances(at elapsedTime: Float) -> [[LightningInstance]] {

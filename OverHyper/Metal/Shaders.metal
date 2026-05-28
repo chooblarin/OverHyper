@@ -53,7 +53,7 @@ float hash21(float2 value) {
 
 float3 sampleSource(texture2d<float> sourceTexture, float2 uv) {
     constexpr sampler textureSampler(address::clamp_to_edge, filter::linear);
-    return sourceTexture.sample(textureSampler, clamp(uv, 0.0, 1.0)).rgb;
+    return sourceTexture.sample(textureSampler, uv).rgb;
 }
 
 float luminance(float3 color) {
@@ -321,24 +321,6 @@ float2 rotate2D(float2 point, float angle) {
         (cosine * point.x) - (sine * point.y),
         (sine * point.x) + (cosine * point.y)
     );
-}
-
-float noise2CrackedGlass(float2 point) {
-    float2 integer = floor(point);
-    float2 fractional = fract(point);
-    fractional = fractional * fractional * (3.0 - (2.0 * fractional));
-
-    float bottom = mix(
-        hash21(integer + float2(0.0, 0.0)),
-        hash21(integer + float2(1.0, 0.0)),
-        fractional.x
-    );
-    float top = mix(
-        hash21(integer + float2(0.0, 1.0)),
-        hash21(integer + float2(1.0, 1.0)),
-        fractional.x
-    );
-    return (2.0 * mix(bottom, top, fractional.y)) - 1.0;
 }
 
 float noise1CrackedGlass(float value) {
@@ -1004,6 +986,10 @@ fragment float4 rainGlassFragmentShader(
 
     float3 refractedColor = sampleSource(sourceTexture, sampleUV);
     float trailMask = saturate(dropData.y * envelope);
+    if (trailMask <= 0.0001) {
+        return float4(saturate(refractedColor), 1.0);
+    }
+
     float3 blurredTrail = rainTrailBlur(sourceTexture, sampleUV, trailMask, texelSize);
     float3 finalColor = mix(refractedColor, blurredTrail, trailMask * 0.55);
     finalColor *= 1.0 - (trailMask * 0.05);
