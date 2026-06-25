@@ -21,7 +21,21 @@ final class OverlayWindowController {
             recreateWindows()
         }
 
+        let resolution = PresentationTargetResolver.resolve(
+            screens: surfaces.map(\.screen),
+            target: settings.presentationTarget
+        )
+        if let warning = resolution.warning {
+            let message = warning.displayMessage
+            logger.warning("Presentation target warning: \(message, privacy: .public)")
+        }
+
         let contexts = surfaces.compactMap { surface -> OverlayRenderContext? in
+            guard let displayID = DisplayCatalog.displayID(for: surface.screen),
+                  resolution.displayIDs.contains(displayID) else {
+                return nil
+            }
+
             guard let layer = surface.hostView.layer else {
                 logger.warning("Missing host layer for overlay window")
                 return nil
@@ -33,6 +47,10 @@ final class OverlayWindowController {
                 hostView: surface.hostView,
                 layer: layer
             )
+        }
+
+        guard !contexts.isEmpty else {
+            return
         }
 
         guard effect.prepareForRender(settings: settings) else {
@@ -51,6 +69,18 @@ final class OverlayWindowController {
         surfaces = NSScreen.screens.map(makeSurface(for:))
 
         logger.debug("Overlay surfaces rebuilt: \(self.surfaces.count)")
+        for surface in surfaces {
+            guard let displayID = DisplayCatalog.displayID(for: surface.screen) else {
+                logger.warning("Overlay surface has no display ID")
+                continue
+            }
+
+            logger.debug("""
+            Overlay surface displayID=\(displayID) \
+            external=\(DisplayCatalog.isExternal(displayID: displayID)) \
+            frame=\(String(describing: surface.screen.frame), privacy: .public)
+            """)
+        }
     }
 
     private func observeEnvironmentChanges() {
@@ -99,7 +129,7 @@ final class OverlayWindowController {
             .ignoresCycle
         ]
         window.contentView = hostView
-        window.orderFront(nil)
+        window.orderFrontRegardless()
 
         return OverlaySurface(screen: screen, window: window, hostView: hostView)
     }

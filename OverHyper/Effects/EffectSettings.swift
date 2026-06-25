@@ -1,1 +1,3 @@
-struct EffectSettings {}
+struct EffectSettings {
+    let presentationTarget: PresentationTarget
+}

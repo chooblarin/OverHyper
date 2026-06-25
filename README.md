@@ -16,6 +16,7 @@ It renders stage effects such as confetti, flash, and shader-based overlays acro
 
 - Menu bar resident app (agent app, no Dock icon)
 - Full-screen, click-through overlay windows on all displays
+- Presentation target settings for all, external, main, or selected displays
 - Confetti effect
 - Flash effect
 - Glitch effect with frozen-frame shader animation
@@ -27,6 +28,7 @@ It renders stage effects such as confetti, flash, and shader-based overlays acro
 - Preset global hotkey slots (`Control + Option + Command + 1...5`)
 - Screen Recording permission flow for shader effect capture
 - Settings window with:
+  - Presentation target picker
   - Effect test fire buttons
   - Hotkey slot assignment for all available effects
 - Runtime screen/space change handling
@@ -69,6 +71,7 @@ Environment setup and build steps are documented in `docs/LOCAL_SELF_USE.md`.
 ## Documentation
 
 - Local self-use setup and build: `docs/LOCAL_SELF_USE.md`
+- Venue presentation mode design: `docs/PRESENTATION_MODE.md`
 - External distribution signing/notarization notes: `docs/NOTARIZATION.md`
 - Swift style review checklist: `docs/STYLE_CHECKLIST.md`
 
@@ -96,6 +99,8 @@ OverHyper/
 │   ├── OverHyperApp.swift          # App entry point and explicit settings window
 │   ├── AppDelegate.swift           # Status item lifecycle and menu actions
 │   └── AppRuntime.swift            # Runtime wiring (overlay/effects/hotkey)
+├── Display/
+│   └── PresentationTarget.swift     # Display inventory and target resolution
 ├── Overlay/
 │   └── OverlayWindowController.swift
 ├── Effects/
@@ -134,12 +139,13 @@ OverHyper/
 1. `AppDelegate` receives menu actions.
 2. `AppRuntime` forwards actions to `EffectOrchestrator`.
 3. `EffectOrchestrator` selects an effect and calls `OverlayWindowController`.
-4. `OverlayWindowController` renders the selected effect on each display surface.
-5. `EffectSettingsStore` provides current settings and persists updates to `UserDefaults`.
+4. `OverlayWindowController` filters display surfaces by the current presentation target.
+5. The selected effect renders only on matching display surfaces.
+6. `EffectSettingsStore` provides current settings and persists updates to `UserDefaults`.
 
 ## Manual E2E Checklist
 
-1. Confetti appears on all connected displays.
+1. Confetti appears on the configured presentation target.
 2. Flash appears when triggered.
 3. Glitch, CRT Burst, Shockwave, Cracked Glass, Neon Edge, and Rain Glass capture the current display image and play cleanly.
 4. Shader effects request Screen Recording permission when needed and abort cleanly if denied.

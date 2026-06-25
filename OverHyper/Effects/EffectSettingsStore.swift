@@ -1,9 +1,22 @@
 import Combine
+import CoreGraphics
 import Foundation
 
 @MainActor
 final class EffectSettingsStore: ObservableObject {
     static let shared = EffectSettingsStore()
+
+    @Published var presentationTargetMode: PresentationTargetMode {
+        didSet {
+            persistPresentationTarget()
+        }
+    }
+
+    @Published var selectedDisplayID: CGDirectDisplayID? {
+        didSet {
+            persistPresentationTarget()
+        }
+    }
 
     @Published private(set) var hotkeyAssignments: [HotkeySlotAssignment] {
         didSet {
@@ -12,7 +25,14 @@ final class EffectSettingsStore: ObservableObject {
     }
 
     var settings: EffectSettings {
-        EffectSettings()
+        EffectSettings(presentationTarget: presentationTarget)
+    }
+
+    var presentationTarget: PresentationTarget {
+        PresentationTarget(
+            mode: presentationTargetMode,
+            selectedDisplayID: selectedDisplayID
+        )
     }
 
     private let userDefaults: UserDefaults
@@ -20,6 +40,8 @@ final class EffectSettingsStore: ObservableObject {
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
 
+        presentationTargetMode = .allDisplays
+        selectedDisplayID = nil
         hotkeyAssignments = HotkeySlotID.allCases.map { slotID in
             HotkeySlotAssignment(
                 slotID: slotID,
@@ -27,6 +49,7 @@ final class EffectSettingsStore: ObservableObject {
             )
         }
 
+        loadPresentationTarget()
         loadHotkeyAssignments()
     }
 
@@ -40,6 +63,26 @@ final class EffectSettingsStore: ObservableObject {
         }
 
         hotkeyAssignments[index].assignedEffect = effect
+    }
+
+    func setPresentationTargetMode(_ mode: PresentationTargetMode) {
+        presentationTargetMode = mode
+    }
+
+    func setSelectedDisplayID(_ displayID: CGDirectDisplayID?) {
+        selectedDisplayID = displayID
+    }
+
+    private func loadPresentationTarget() {
+        if let storedMode = userDefaults.string(forKey: Keys.presentationTargetMode),
+           let mode = PresentationTargetMode(rawValue: storedMode) {
+            presentationTargetMode = mode
+        }
+
+        if userDefaults.object(forKey: Keys.selectedDisplayID) != nil {
+            let storedDisplayID = userDefaults.integer(forKey: Keys.selectedDisplayID)
+            selectedDisplayID = CGDirectDisplayID(storedDisplayID)
+        }
     }
 
     private func loadHotkeyAssignments() {
@@ -65,9 +108,22 @@ final class EffectSettingsStore: ObservableObject {
             }
         }
     }
+
+    private func persistPresentationTarget() {
+        userDefaults.set(presentationTargetMode.rawValue, forKey: Keys.presentationTargetMode)
+
+        if let selectedDisplayID {
+            userDefaults.set(Int(selectedDisplayID), forKey: Keys.selectedDisplayID)
+        } else {
+            userDefaults.removeObject(forKey: Keys.selectedDisplayID)
+        }
+    }
 }
 
 private enum Keys {
+    static let presentationTargetMode = "overhyper.settings.presentationTarget.mode"
+    static let selectedDisplayID = "overhyper.settings.presentationTarget.selectedDisplayID"
+
     static func hotkeyAssignmentKey(for slotID: HotkeySlotID) -> String {
         "overhyper.settings.hotkey.\(slotID.rawValue)"
     }
