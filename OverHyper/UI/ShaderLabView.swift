@@ -1,21 +1,28 @@
 #if DEBUG
 import AppKit
 import SwiftUI
+import simd
 
 struct ShaderLabView: View {
     @State private var selectedStyle = ShaderEffectStyle.glitch
     @State private var duration = 1.6
-    @State private var intensity = 1.0
+    @State private var randomSeed = Double(ShaderTweakDefaults.randomSeed)
+    @State private var parameterValuesByStyle = ShaderLabParameterValues.defaultsByStyle()
     @State private var isPlaying = true
     @State private var pausedTime = 0.0
     @State private var playbackAnchorDate = Date()
     @State private var playbackAnchorTime = 0.0
 
     private let sampleImage = ShaderPreviewImage.make()
+    private let parameterColumns = [
+        GridItem(.flexible(), spacing: 18),
+        GridItem(.flexible(), spacing: 18)
+    ]
 
     var body: some View {
         TimelineView(.animation) { timeline in
             let currentTime = previewTime(at: timeline.date)
+            let parameterValues = currentParameterValues
 
             HStack(spacing: 0) {
                 effectSidebar
@@ -28,13 +35,17 @@ struct ShaderLabView: View {
                         image: sampleImage,
                         elapsedTime: currentTime,
                         duration: duration,
-                        intensity: intensity
+                        randomSeed: randomSeed,
+                        tweaks: parameterValues.vector
                     )
                     .aspectRatio(16.0 / 9.0, contentMode: .fit)
                     .background(.black)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    controls(currentTime: currentTime)
+                    controls(
+                        currentTime: currentTime,
+                        parameterValues: parameterValues
+                    )
                 }
                 .padding(20)
             }
@@ -47,6 +58,11 @@ struct ShaderLabView: View {
             pausedTime = min(pausedTime, duration)
             playbackAnchorTime = min(playbackAnchorTime, duration)
         }
+    }
+
+    private var currentParameterValues: ShaderLabParameterValues {
+        parameterValuesByStyle[selectedStyle]
+            ?? ShaderLabParameterValues.defaults(for: selectedStyle)
     }
 
     private var effectSidebar: some View {
@@ -85,7 +101,10 @@ struct ShaderLabView: View {
         .padding(16)
     }
 
-    private func controls(currentTime: Double) -> some View {
+    private func controls(
+        currentTime: Double,
+        parameterValues: ShaderLabParameterValues
+    ) -> some View {
         VStack(spacing: 12) {
             HStack(spacing: 10) {
                 Button {
@@ -104,6 +123,14 @@ struct ShaderLabView: View {
                 }
                 .help("Restart")
 
+                Button {
+                    resetCurrentEffect()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .frame(width: 18)
+                }
+                .help("Reset to Defaults")
+
                 Text(timeText(currentTime))
                     .font(.system(.body, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -121,13 +148,14 @@ struct ShaderLabView: View {
                 )
             }
 
-            HStack(spacing: 18) {
-                controlSlider(
-                    title: "Intensity",
-                    value: $intensity,
-                    range: 0...1.8,
-                    formattedValue: String(format: "%.2f", intensity)
-                )
+            LazyVGrid(columns: parameterColumns, spacing: 12) {
+                ForEach(selectedStyle.shaderLabParameters) { parameter in
+                    controlSlider(
+                        parameter: parameter,
+                        value: parameterBinding(for: parameter),
+                        currentValue: parameterValues[parameter.slot]
+                    )
+                }
 
                 controlSlider(
                     title: "Duration",
@@ -135,15 +163,47 @@ struct ShaderLabView: View {
                     range: 0.4...4.0,
                     formattedValue: String(format: "%.1fs", duration)
                 )
+
+                controlSlider(
+                    title: "Random Seed",
+                    value: $randomSeed,
+                    range: 0...99,
+                    formattedValue: String(format: "%.0f", randomSeed),
+                    step: 1
+                )
             }
         }
+    }
+
+    private func parameterBinding(for parameter: ShaderLabParameter) -> Binding<Double> {
+        Binding {
+            currentParameterValues[parameter.slot]
+        } set: { newValue in
+            var values = currentParameterValues
+            values[parameter.slot] = newValue
+            parameterValuesByStyle[selectedStyle] = values
+        }
+    }
+
+    private func controlSlider(
+        parameter: ShaderLabParameter,
+        value: Binding<Double>,
+        currentValue: Double
+    ) -> some View {
+        controlSlider(
+            title: parameter.title,
+            value: value,
+            range: parameter.range,
+            formattedValue: parameter.formatted(currentValue)
+        )
     }
 
     private func controlSlider(
         title: String,
         value: Binding<Double>,
         range: ClosedRange<Double>,
-        formattedValue: String
+        formattedValue: String,
+        step: Double? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -154,7 +214,11 @@ struct ShaderLabView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Slider(value: value, in: range)
+            if let step {
+                Slider(value: value, in: range, step: step)
+            } else {
+                Slider(value: value, in: range)
+            }
         }
     }
 
@@ -191,6 +255,15 @@ struct ShaderLabView: View {
         isPlaying = true
     }
 
+    private func resetCurrentEffect() {
+        parameterValuesByStyle[selectedStyle] = ShaderLabParameterValues.defaults(
+            for: selectedStyle
+        )
+        randomSeed = Double(ShaderTweakDefaults.randomSeed)
+        duration = 1.6
+        restart()
+    }
+
     private func timeText(_ currentTime: Double) -> String {
         "\(String(format: "%.2f", currentTime)) / \(String(format: "%.2f", duration))"
     }
@@ -201,7 +274,8 @@ private struct ShaderPreviewMetalView: NSViewRepresentable {
     let image: CGImage
     let elapsedTime: Double
     let duration: Double
-    let intensity: Double
+    let randomSeed: Double
+    let tweaks: SIMD4<Float>
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -230,7 +304,8 @@ private struct ShaderPreviewMetalView: NSViewRepresentable {
     private func updateCoordinator(_ coordinator: Coordinator) {
         coordinator.renderState.elapsedTime = Float(elapsedTime)
         coordinator.renderState.duration = Float(duration)
-        coordinator.renderState.intensity = Float(intensity)
+        coordinator.renderState.randomSeed = Float(randomSeed)
+        coordinator.renderState.tweaks = tweaks
     }
 
     final class Coordinator {
@@ -241,7 +316,8 @@ private struct ShaderPreviewMetalView: NSViewRepresentable {
 private final class ShaderPreviewRenderState {
     var elapsedTime: Float = 0
     var duration: Float = 1.6
-    var intensity: Float = 1
+    var randomSeed = ShaderTweakDefaults.randomSeed
+    var tweaks = ShaderTweakDefaults.neutral
 }
 
 private final class ShaderPreviewContainerView: NSView {
@@ -269,8 +345,11 @@ private final class ShaderPreviewContainerView: NSView {
             elapsedTimeProvider: { [weak renderState] in
                 renderState?.elapsedTime ?? 0
             },
+            randomSeedProvider: { [weak renderState] in
+                renderState?.randomSeed ?? ShaderTweakDefaults.randomSeed
+            },
             tweakProvider: { [weak renderState] in
-                SIMD4<Float>(renderState?.intensity ?? 1, 0, 0, 0)
+                renderState?.tweaks ?? ShaderTweakDefaults.neutral
             }
         ) else {
             currentStyle = nil

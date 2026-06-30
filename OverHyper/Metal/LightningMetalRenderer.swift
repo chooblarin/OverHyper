@@ -41,6 +41,7 @@ private struct LightningUniforms {
     let viewportSize: SIMD2<Float>
     let elapsedTime: Float
     let totalDuration: Float
+    let randomSeed: Float
     // Keep this layout aligned with ShaderUniforms in Shaders.metal.
     let tweaks: SIMD4<Float>
 }
@@ -177,7 +178,8 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
             viewportSize: viewportSize,
             elapsedTime: elapsedTime,
             totalDuration: duration,
-            tweaks: SIMD4<Float>(1, 0, 0, 0)
+            randomSeed: ShaderTweakDefaults.randomSeed,
+            tweaks: ShaderTweakDefaults.neutral
         )
         let groupedInstances = activeInstances(at: elapsedTime)
 

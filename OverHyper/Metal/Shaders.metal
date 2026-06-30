@@ -15,7 +15,8 @@ struct ShaderUniforms {
     float2 viewportSize;
     float elapsedTime;
     float totalDuration;
-    // tweaks: x = intensity, y/z/w = reserved for Shader Lab controls.
+    float randomSeed;
+    // tweaks: x = intensity, y/z/w = effect-specific Shader Lab controls.
     float4 tweaks;
 };
 
@@ -53,6 +54,28 @@ float hash21(float2 value) {
     return fract(sin(dot(value, float2(127.1, 311.7))) * 43758.5453123);
 }
 
+float shaderRandomSeed(constant ShaderUniforms &uniforms) {
+    return uniforms.randomSeed * 97.131;
+}
+
+float seededHash11(float value, float seed) {
+    return hash11(value + seed);
+}
+
+float seededHash21(float2 value, float seed) {
+    return hash21(value + float2(seed, seed * 1.371));
+}
+
+float3 seededHash31(float value, float seed) {
+    float3 p3 = fract(float3(value + seed) * float3(0.1031, 0.11369, 0.13787));
+    p3 += dot(p3, p3.yzx + 19.19 + (seed * 0.001));
+    return fract(float3(
+        (p3.x + p3.y) * p3.z,
+        (p3.x + p3.z) * p3.y,
+        (p3.y + p3.z) * p3.x
+    ));
+}
+
 float3 sampleSource(texture2d<float> sourceTexture, float2 uv) {
     constexpr sampler textureSampler(address::clamp_to_edge, filter::linear);
     return sourceTexture.sample(textureSampler, uv).rgb;
@@ -60,6 +83,18 @@ float3 sampleSource(texture2d<float> sourceTexture, float2 uv) {
 
 float shaderIntensity(constant ShaderUniforms &uniforms) {
     return max(uniforms.tweaks.x, 0.0);
+}
+
+float shaderTweakY(constant ShaderUniforms &uniforms) {
+    return max(uniforms.tweaks.y, 0.0);
+}
+
+float shaderTweakZ(constant ShaderUniforms &uniforms) {
+    return max(uniforms.tweaks.z, 0.0);
+}
+
+float shaderTweakW(constant ShaderUniforms &uniforms) {
+    return max(uniforms.tweaks.w, 0.0);
 }
 
 float luminance(float3 color) {
@@ -221,18 +256,18 @@ float2 rainFieldUV(float2 uv, float aspect) {
     );
 }
 
-float2 rainDropLayer(float2 uv, float time) {
+float2 rainDropLayer(float2 uv, float time, float seed) {
     float2 originalUV = uv;
 
     uv.y += time * kRainFlowSpeed;
     float2 grid = kRainDropStretch * 2.0;
     float2 cellID = floor(uv * grid);
 
-    float columnShift = hash11(cellID.x);
+    float columnShift = seededHash11(cellID.x, seed);
     uv.y += columnShift;
 
     cellID = floor(uv * grid);
-    float3 noise = hash31((cellID.x * 35.2) + (cellID.y * 2376.1));
+    float3 noise = seededHash31((cellID.x * 35.2) + (cellID.y * 2376.1), seed);
     float2 local = fract(uv * grid) - float2(0.5, 0.0);
 
     float offsetX = noise.x - 0.5;
@@ -272,12 +307,12 @@ float2 rainDropLayer(float2 uv, float time) {
     return float2(combinedMask, trail);
 }
 
-float rainStaticDrops(float2 uv, float time) {
+float rainStaticDrops(float2 uv, float time, float seed) {
     uv *= kRainStaticDropScale;
 
     float2 cellID = floor(uv);
     float2 local = fract(uv) - 0.5;
-    float3 noise = hash31((cellID.x * 107.45) + (cellID.y * 3543.654));
+    float3 noise = seededHash31((cellID.x * 107.45) + (cellID.y * 3543.654), seed);
     float2 point = (noise.xy - 0.5) * 0.7;
     float distanceToPoint = length(local - point);
 
@@ -290,11 +325,12 @@ float2 rainDrops(
     float time,
     float staticAmount,
     float layer1Amount,
-    float layer2Amount
+    float layer2Amount,
+    float seed
 ) {
-    float staticMask = rainStaticDrops(uv, time) * staticAmount;
-    float2 layer1 = rainDropLayer(uv, time) * layer1Amount;
-    float2 layer2 = rainDropLayer(uv * kRainSecondaryLayerScale, time) * layer2Amount;
+    float staticMask = rainStaticDrops(uv, time, seed) * staticAmount;
+    float2 layer1 = rainDropLayer(uv, time, seed) * layer1Amount;
+    float2 layer2 = rainDropLayer(uv * kRainSecondaryLayerScale, time, seed + 17.0) * layer2Amount;
 
     float coverage = staticMask + layer1.x + layer2.x;
     coverage = smoothstepRain(0.3, 1.0, coverage);
@@ -335,13 +371,23 @@ float noise1CrackedGlass(float value) {
     return mix(hash11(integer), hash11(integer + 1.0), fractional);
 }
 
-float lowFrequencyNoiseCrackedGlass(float value) {
+float seededNoise1CrackedGlass(float value, float seed) {
+    float integer = floor(value);
+    float fractional = fract(value);
+    return mix(
+        seededHash11(integer, seed),
+        seededHash11(integer + 1.0, seed),
+        fractional
+    );
+}
+
+float lowFrequencyNoiseCrackedGlass(float value, float seed) {
     float wrapped = fract(value);
     float resolution = 10.0;
     float segmentA = floor(wrapped * resolution);
     float segmentB = segmentA + 1.0;
-    float sampleA = noise1CrackedGlass(fmod(segmentA, resolution));
-    float sampleB = noise1CrackedGlass(fmod(segmentB, resolution));
+    float sampleA = seededNoise1CrackedGlass(fmod(segmentA, resolution), seed);
+    float sampleB = seededNoise1CrackedGlass(fmod(segmentB, resolution), seed);
     float interpolation = fract(wrapped * resolution);
     return (mix(sampleA, sampleB, interpolation) * 2.0) - 1.0;
 }
@@ -350,11 +396,11 @@ float atan01CrackedGlass(float2 point) {
     return (atan2(point.y, point.x) / 6.28318530718) + 0.5;
 }
 
-float2 wrappedHashCrackedGlass(float2 point) {
+float2 wrappedHashCrackedGlass(float2 point, float seed) {
     float2 wrapped = fract(point / kCrackedGlassAngularSegments) * kCrackedGlassAngularSegments;
     return float2(
-        hash21(wrapped + float2(0.37, 1.79)),
-        hash21(wrapped + float2(8.11, 3.17))
+        seededHash21(wrapped + float2(0.37, 1.79), seed),
+        seededHash21(wrapped + float2(8.11, 3.17), seed)
     );
 }
 
@@ -376,7 +422,7 @@ struct CrackedGlassSample {
     float mask;
 };
 
-CrackedGlassVoronoiResult crackedGlassVoronoi(float2 point) {
+CrackedGlassVoronoiResult crackedGlassVoronoi(float2 point, float seed) {
     float2 integer = floor(point);
     float2 fractional = fract(point);
     float2 bestGrid = float2(0.0, 0.0);
@@ -386,7 +432,7 @@ CrackedGlassVoronoiResult crackedGlassVoronoi(float2 point) {
     for (int y = -1; y <= 1; y += 1) {
         for (int x = -1; x <= 1; x += 1) {
             float2 grid = float2(float(x), float(y));
-            float2 jitter = kCrackedGlassCellJitter * wrappedHashCrackedGlass(integer + grid);
+            float2 jitter = kCrackedGlassCellJitter * wrappedHashCrackedGlass(integer + grid, seed);
             float2 relative = grid + jitter - fractional;
             float distanceSquared = dot(relative, relative);
 
@@ -403,7 +449,7 @@ CrackedGlassVoronoiResult crackedGlassVoronoi(float2 point) {
     for (int y = -2; y <= 2; y += 1) {
         for (int x = -2; x <= 2; x += 1) {
             float2 grid = bestGrid + float2(float(x), float(y));
-            float2 jitter = kCrackedGlassCellJitter * wrappedHashCrackedGlass(integer + grid);
+            float2 jitter = kCrackedGlassCellJitter * wrappedHashCrackedGlass(integer + grid, seed);
             float2 relative = grid + jitter - fractional;
 
             if (dot(bestVector - relative, bestVector - relative) > 1e-6) {
@@ -450,20 +496,23 @@ CrackedGlassSample renderCrackedGlassSample(
     float2 fragCoord
 ) {
     float2 lensUV = (fragCoord / context.viewportWidth) - context.uvCenter;
+    float seed = shaderRandomSeed(uniforms);
     float radius = length(lensUV);
 
     float2 cylindrical = float2(
         max(0.5, pow(max(radius, 1e-4), 0.1)),
         atan01CrackedGlass(lensUV)
     );
-    cylindrical.x += 0.015 * abs(lowFrequencyNoiseCrackedGlass(cylindrical.y));
+    cylindrical.x += 0.015 * abs(lowFrequencyNoiseCrackedGlass(cylindrical.y, seed));
 
     float2 frequency = float2(12.0, kCrackedGlassAngularSegments);
-    CrackedGlassVoronoiResult voronoiResult = crackedGlassVoronoi(cylindrical * frequency);
+    CrackedGlassVoronoiResult voronoiResult = crackedGlassVoronoi(cylindrical * frequency, seed);
     float2 cellID = wrapAngularCellID(voronoiResult.cellID);
     float centerDistance = length(voronoiResult.centerVector);
     float radiusFactor = pow(min(radius, 1.0), 0.12);
-    float edgeWidth = mix(0.040, 0.0, radiusFactor);
+    float crackWidth = shaderTweakW(uniforms);
+    float refractionStrength = shaderTweakZ(uniforms);
+    float edgeWidth = mix(0.040, 0.0, radiusFactor) * crackWidth;
     float edgeSoftness = mix(0.00045, 0.00008, radiusFactor);
     float edge = smoothstep(edgeWidth, edgeWidth + edgeSoftness, voronoiResult.borderDistance);
     float crackMask = 1.0 - edge;
@@ -473,9 +522,9 @@ CrackedGlassSample renderCrackedGlassSample(
     float3 viewDirection = normalize(-world);
 
     float3 normalOffset = (float3(
-        noise1CrackedGlass(cellID.x * 7.0),
-        noise1CrackedGlass(cellID.y * 13.0),
-        noise1CrackedGlass(27.0 * (cellID.x - cellID.y))
+        seededNoise1CrackedGlass(cellID.x * 7.0, seed),
+        seededNoise1CrackedGlass(cellID.y * 13.0, seed),
+        seededNoise1CrackedGlass(27.0 * (cellID.x - cellID.y), seed)
     ) * 2.0) - 1.0;
     float3 surfaceNormal = normalize(float3(0.0, 0.0, 1.0) + (0.1 * normalOffset));
     float3 reflectedDirection = reflect(-viewDirection, surfaceNormal);
@@ -483,10 +532,12 @@ CrackedGlassSample renderCrackedGlassSample(
     float2 baseUV = fragCoord / uniforms.viewportSize;
     float2 reflectedUV = baseUV
         + float2(reflectedDirection.x / max(context.aspect, 0.0001), -reflectedDirection.y)
-        * (0.010 + (0.003 * centerDistance));
+        * (0.010 + (0.003 * centerDistance))
+        * refractionStrength;
     float2 refractionUV = baseUV
         + float2(surfaceNormal.x / max(context.aspect, 0.0001), -surfaceNormal.y)
-        * (0.004 + (0.002 * crackMask));
+        * (0.004 + (0.002 * crackMask))
+        * refractionStrength;
     float3 env = sampleSource(sourceTexture, mix(refractionUV, reflectedUV, 0.38));
 
     float fresnel = pow(1.0 - saturate(dot(surfaceNormal, -viewDirection)), 3.5);
@@ -664,6 +715,10 @@ fragment float4 glitchFragmentShader(
 ) {
     float time = uniforms.elapsedTime;
     float intensity = shaderIntensity(uniforms);
+    float sliceDrift = shaderTweakY(uniforms);
+    float chromaShift = shaderTweakZ(uniforms);
+    float grainAmount = shaderTweakW(uniforms);
+    float seed = shaderRandomSeed(uniforms);
     float freezeEnd = uniforms.totalDuration * 0.08;
     float rampIn = smoothstep(freezeEnd, uniforms.totalDuration * 0.20, time);
     float rampOut = 1.0 - smoothstep(uniforms.totalDuration * 0.72, uniforms.totalDuration, time);
@@ -682,18 +737,22 @@ fragment float4 glitchFragmentShader(
     float2 uv = in.textureCoordinate;
     float lineDensity = max(uniforms.viewportSize.y / 18.0, 1.0);
     float bandIndex = floor(uv.y * 28.0);
-    float bandNoise = hash21(float2(bandIndex, floor(time * 24.0)));
-    float thinBand = step(0.74, hash21(float2(floor(uv.y * lineDensity), floor(time * 42.0))));
+    float bandNoise = seededHash21(float2(bandIndex, floor(time * 24.0)), seed);
+    float thinBand = step(0.74, seededHash21(float2(floor(uv.y * lineDensity), floor(time * 42.0)), seed));
     float electricWave = sin((uv.y * 210.0) - (time * 18.0));
-    float sliceOffset = (bandNoise - 0.5) * 0.12 * peakAmount;
-    float waveOffset = electricWave * 0.005 * peakAmount;
-    float burstOffset = thinBand * 0.038 * pulse * (hash11(floor(time * 34.0)) - 0.5);
+    float sliceOffset = (bandNoise - 0.5) * 0.12 * peakAmount * sliceDrift;
+    float waveOffset = electricWave * 0.005 * peakAmount * sliceDrift;
+    float burstOffset = thinBand
+        * 0.038
+        * pulse
+        * sliceDrift
+        * (seededHash11(floor(time * 34.0), seed) - 0.5);
     float horizontalOffset = sliceOffset + waveOffset + burstOffset;
 
     float2 sampleUV = uv;
     sampleUV.x = clamp(sampleUV.x + horizontalOffset, 0.0, 1.0);
 
-    float channelOffset = (0.005 + (pulse * 0.008)) * peakAmount;
+    float channelOffset = (0.005 + (pulse * 0.008)) * peakAmount * chromaShift;
     float3 baseColor = sampleSource(sourceTexture, uv);
     float red = sampleSource(
         sourceTexture,
@@ -713,8 +772,8 @@ fragment float4 glitchFragmentShader(
 
     float3 glitchColor = float3(red, green, blue);
     float scanline = 0.92 + (0.08 * sin((uv.y * uniforms.viewportSize.y * 1.22) - (time * 34.0)));
-    float grain = (hash21((uv * uniforms.viewportSize) + float2(time * 83.0, time * 41.0)) - 0.5)
-        * (0.05 * peakAmount);
+    float grain = (seededHash21((uv * uniforms.viewportSize) + float2(time * 83.0, time * 41.0), seed) - 0.5)
+        * (0.05 * peakAmount * grainAmount);
     float3 neonTint = float3(0.025, 0.12, 0.14) * peakAmount;
     float3 magentaEdge = float3(0.12, 0.02, 0.11) * thinBand * peakAmount;
     float glow = pulse * 0.11;
@@ -737,22 +796,27 @@ fragment float4 crtBurstFragmentShader(
 ) {
     float time = uniforms.elapsedTime;
     float intensity = shaderIntensity(uniforms);
+    float curvature = shaderTweakY(uniforms);
+    float convergence = shaderTweakZ(uniforms);
+    float scanlineStrength = shaderTweakW(uniforms);
     float rampIn = smoothstep(uniforms.totalDuration * 0.10, uniforms.totalDuration * 0.24, time);
     float rampOut = 1.0 - smoothstep(uniforms.totalDuration * 0.55, uniforms.totalDuration, time);
     float burstAmount = rampIn * rampOut;
 
     float2 uv = in.textureCoordinate;
-    float2 distortedUV = barrelDistortion(uv, 0.085 * burstAmount);
+    float2 distortedUV = barrelDistortion(uv, 0.085 * burstAmount * curvature);
     float2 centered = distortedUV - 0.5;
-    float2 convergenceOffset = centered * (0.018 * burstAmount);
+    float2 convergenceOffset = centered * (0.018 * burstAmount * convergence);
 
     float3 baseColor = sampleSource(sourceTexture, uv);
     float red = sampleSource(sourceTexture, distortedUV + convergenceOffset).r;
     float green = sampleSource(sourceTexture, distortedUV).g;
     float blue = sampleSource(sourceTexture, distortedUV - convergenceOffset).b;
 
-    float scanline = 0.88 + (0.12 * sin((uv.y * uniforms.viewportSize.y * 1.35) - (time * 18.0)));
-    float apertureMask = 0.94 + (0.06 * sin((uv.x * uniforms.viewportSize.x * 0.65) + (time * 11.0)));
+    float scanline = 1.0 - (0.12 * scanlineStrength)
+        + (0.12 * scanlineStrength * sin((uv.y * uniforms.viewportSize.y * 1.35) - (time * 18.0)));
+    float apertureMask = 1.0 - (0.06 * scanlineStrength)
+        + (0.06 * scanlineStrength * sin((uv.x * uniforms.viewportSize.x * 0.65) + (time * 11.0)));
     float vignette = 1.0 - (distance(uv, float2(0.5, 0.5)) * 0.34 * burstAmount);
     float bloom = burstAmount * 0.18;
 
@@ -775,6 +839,9 @@ fragment float4 shockwaveFragmentShader(
     float3 baseColor = sampleSource(sourceTexture, uv);
     float time = uniforms.elapsedTime;
     float intensity = shaderIntensity(uniforms);
+    float radiusScale = shaderTweakY(uniforms);
+    float refractionStrength = shaderTweakZ(uniforms);
+    float rippleStrength = shaderTweakW(uniforms);
 
     float progress = saturate(
         (time - (uniforms.totalDuration * 0.12))
@@ -786,25 +853,27 @@ fragment float4 shockwaveFragmentShader(
     float aspect = uniforms.viewportSize.x / max(uniforms.viewportSize.y, 1.0);
     float2 centered = (uv - 0.5) * float2(aspect, 1.0);
     float distanceFromCenter = length(centered);
-    float waveRadius = waveProgress * 1.10;
+    float waveRadius = waveProgress * 1.10 * radiusScale;
     float radiusDelta = distanceFromCenter - waveRadius;
     float compression = exp(-pow(radiusDelta / 0.050, 2.0) * 9.0) * active;
     float trailingEnvelope = exp(-max(radiusDelta, 0.0) * 6.5) * active;
     float trailingPhase = sin((radiusDelta * 58.0) - (time * 10.0));
     float banding = sin((distanceFromCenter * 24.0) - (time * 5.0));
-    float trailingRipples = max(trailingPhase, 0.0) * trailingEnvelope * 0.42;
+    float trailingRipples = max(trailingPhase, 0.0) * trailingEnvelope * 0.42 * rippleStrength;
     float innerRipples = max(banding, 0.0)
         * exp(-pow((radiusDelta + 0.05) / 0.16, 2.0) * 4.5)
         * active
-        * 0.20;
+        * 0.20
+        * rippleStrength;
     float2 direction = distanceFromCenter > 0.0001 ? normalize(centered) : float2(0.0, 0.0);
     float turbulence = sin((centered.y * 30.0) + (time * 8.0))
         * cos((centered.x * 24.0) - (time * 6.0))
         * 0.008
         * active;
-    float2 refractionOffset = direction * ((compression * 0.095) + (trailingRipples * 0.028));
+    float2 refractionOffset = direction * ((compression * 0.095) + (trailingRipples * 0.028))
+        * refractionStrength;
     refractionOffset += float2(turbulence / aspect, turbulence * 0.45);
-    float channelOffset = ((compression * 0.010) + (trailingRipples * 0.004));
+    float channelOffset = ((compression * 0.010) + (trailingRipples * 0.004)) * refractionStrength;
 
     float2 sampleUV = uv + float2(refractionOffset.x / aspect, refractionOffset.y);
     float red = sampleSource(
@@ -839,6 +908,7 @@ fragment float4 crackedGlassFragmentShader(
     float time = uniforms.elapsedTime;
     float duration = uniforms.totalDuration;
     float intensity = shaderIntensity(uniforms);
+    float spread = shaderTweakY(uniforms);
     float2 uv = in.textureCoordinate;
     float3 baseColor = sampleSource(sourceTexture, uv);
     CrackedGlassContext context = makeCrackedGlassContext(uniforms);
@@ -847,7 +917,7 @@ fragment float4 crackedGlassFragmentShader(
     float2 fragCoord = uv * uniforms.viewportSize;
     float2 lensUV = (fragCoord / context.viewportWidth) - context.uvCenter;
     float radius = length(lensUV);
-    float fractureFront = smoothstep(-0.02, 0.028, snapProgress - (radius * 1.28));
+    float fractureFront = smoothstep(-0.02, 0.028, snapProgress - (radius * 1.28 / max(spread, 0.001)));
     float reveal = fractureFront * hold;
 
     if (reveal <= 0.0001) {
@@ -898,6 +968,10 @@ fragment float4 neonEdgeFragmentShader(
 ) {
     float time = uniforms.elapsedTime;
     float intensity = shaderIntensity(uniforms);
+    float edgeWidth = shaderTweakY(uniforms);
+    float glowStrength = shaderTweakZ(uniforms);
+    float pulseStrength = shaderTweakW(uniforms);
+    float seed = shaderRandomSeed(uniforms);
     float rampIn = smoothstep(uniforms.totalDuration * 0.08, uniforms.totalDuration * 0.20, time);
     float rampOut = 1.0 - smoothstep(uniforms.totalDuration * 0.55, uniforms.totalDuration, time);
     float edgeAmount = rampIn * rampOut;
@@ -905,8 +979,8 @@ fragment float4 neonEdgeFragmentShader(
     float2 uv = in.textureCoordinate;
     float3 baseColor = sampleSource(sourceTexture, uv);
     float2 texelSize = 1.0 / max(uniforms.viewportSize, float2(1.0, 1.0));
-    float edge = edgeStrength(sourceTexture, uv, texelSize * 1.3);
-    float halo = edgeStrength(sourceTexture, uv, texelSize * 2.8);
+    float edge = edgeStrength(sourceTexture, uv, texelSize * 1.3 * edgeWidth);
+    float halo = edgeStrength(sourceTexture, uv, texelSize * 2.8 * edgeWidth);
     float edgeMask = smoothstep(0.10, 0.34, edge) * edgeAmount;
     float haloMask = smoothstep(0.08, 0.24, halo) * edgeAmount * 0.55;
 
@@ -918,7 +992,7 @@ fragment float4 neonEdgeFragmentShader(
     float neonMixA = 0.5 + (0.5 * waveA);
     float neonMixB = 0.5 + (0.5 * waveB);
     float neonMixC = 0.5 + (0.5 * waveC);
-    float pulse = 0.5 + (0.5 * waveD);
+    float pulse = mix(1.0, 0.5 + (0.5 * waveD), pulseStrength);
 
     float3 cyan = float3(0.00, 1.00, 1.00);
     float3 magenta = float3(1.00, 0.00, 0.82);
@@ -934,9 +1008,9 @@ fragment float4 neonEdgeFragmentShader(
     edgeColor *= 1.0 + (pulse * 0.22);
 
     float3 darkenedBase = mix(baseColor, baseColor * 0.10, edgeAmount * 0.92);
-    float3 glow = edgeColor * edgeMask * (2.5 + (pulse * 0.35));
-    float3 outerGlow = edgeColor * haloMask * (1.05 + (pulse * 0.20));
-    float noise = (hash21((uv * uniforms.viewportSize * 0.6) + float2(time * 57.0, time * 31.0)) - 0.5)
+    float3 glow = edgeColor * edgeMask * (2.5 + (pulse * 0.35)) * glowStrength;
+    float3 outerGlow = edgeColor * haloMask * (1.05 + (pulse * 0.20)) * glowStrength;
+    float noise = (seededHash21((uv * uniforms.viewportSize * 0.6) + float2(time * 57.0, time * 31.0), seed) - 0.5)
         * 0.04 * edgeAmount;
 
     float3 finalColor = darkenedBase + glow + outerGlow;
@@ -954,6 +1028,10 @@ fragment float4 rainGlassFragmentShader(
     float2 uv = in.textureCoordinate;
     float3 baseColor = sampleSource(sourceTexture, uv);
     float envelope = rainEnvelope(uniforms) * shaderIntensity(uniforms);
+    float coverage = shaderTweakY(uniforms);
+    float refractionStrength = shaderTweakZ(uniforms);
+    float trailBlur = shaderTweakW(uniforms);
+    float seed = shaderRandomSeed(uniforms);
 
     if (envelope <= 0.0001) {
         return float4(baseColor, 1.0);
@@ -963,7 +1041,7 @@ fragment float4 rainGlassFragmentShader(
     float2 texelSize = 1.0 / max(uniforms.viewportSize, float2(1.0, 1.0));
     float2 uvCentered = rainFieldUV(uv, aspect);
 
-    float rainAmount = kRainStrength * envelope;
+    float rainAmount = kRainStrength * envelope * coverage;
     float staticAmount = smoothstep(-0.5, 1.0, rainAmount) * kRainStaticBoost;
     float layer1Amount = smoothstep(0.25, 0.75, rainAmount);
     float layer2Amount = smoothstep(0.0, 0.5, rainAmount);
@@ -973,7 +1051,8 @@ fragment float4 rainGlassFragmentShader(
         uniforms.elapsedTime,
         staticAmount,
         layer1Amount,
-        layer2Amount
+        layer2Amount,
+        seed
     );
 
     float2 stepX = float2(texelSize.x * 2.0 * aspect, 0.0);
@@ -983,20 +1062,23 @@ fragment float4 rainGlassFragmentShader(
         uniforms.elapsedTime,
         staticAmount,
         layer1Amount,
-        layer2Amount
+        layer2Amount,
+        seed
     ).x;
     float coverageY = rainDrops(
         uvCentered - stepY,
         uniforms.elapsedTime,
         staticAmount,
         layer1Amount,
-        layer2Amount
+        layer2Amount,
+        seed
     ).x;
     float2 normal = float2(coverageX - dropData.x, coverageY - dropData.x);
 
     float2 sampleOffset = float2(normal.x / max(aspect, 0.0001), -normal.y)
         * (kRainRefractionBase + (dropData.y * kRainRefractionTrailBoost))
-        * envelope;
+        * envelope
+        * refractionStrength;
     float2 sampleUV = clamp(uv + sampleOffset, 0.0, 1.0);
 
     float3 refractedColor = sampleSource(sourceTexture, sampleUV);
@@ -1006,7 +1088,7 @@ fragment float4 rainGlassFragmentShader(
     }
 
     float3 blurredTrail = rainTrailBlur(sourceTexture, sampleUV, trailMask, texelSize);
-    float3 finalColor = mix(refractedColor, blurredTrail, trailMask * 0.55);
+    float3 finalColor = mix(refractedColor, blurredTrail, saturate(trailMask * 0.55 * trailBlur));
     finalColor *= 1.0 - (trailMask * 0.05);
 
     return float4(saturate(finalColor), 1.0);

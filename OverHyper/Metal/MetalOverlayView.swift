@@ -16,6 +16,7 @@ final class MetalOverlayView: MTKView {
         duration: TimeInterval,
         durationProvider: (() -> Float)? = nil,
         elapsedTimeProvider: (() -> Float)? = nil,
+        randomSeedProvider: (() -> Float)? = nil,
         tweakProvider: (() -> SIMD4<Float>)? = nil
     ) {
         guard let device = MTLCreateSystemDefaultDevice() else {
@@ -29,6 +30,7 @@ final class MetalOverlayView: MTKView {
             duration: duration,
             durationProvider: durationProvider,
             elapsedTimeProvider: elapsedTimeProvider,
+            randomSeedProvider: randomSeedProvider,
             tweakProvider: tweakProvider
         ) else {
             return nil

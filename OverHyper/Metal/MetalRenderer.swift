@@ -12,12 +12,14 @@ private struct ShaderUniforms {
     let viewportSize: SIMD2<Float>
     let elapsedTime: Float
     let totalDuration: Float
+    let randomSeed: Float
     let tweaks: SIMD4<Float>
 }
 
 final class MetalRenderer: NSObject, MTKViewDelegate {
     private let durationProvider: () -> Float
     private let elapsedTimeProvider: (() -> Float)?
+    private let randomSeedProvider: () -> Float
     private let tweakProvider: () -> SIMD4<Float>
     private let commandQueue: MTLCommandQueue
     private let pipelineState: MTLRenderPipelineState
@@ -34,12 +36,14 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
         duration: TimeInterval,
         durationProvider: (() -> Float)? = nil,
         elapsedTimeProvider: (() -> Float)? = nil,
+        randomSeedProvider: (() -> Float)? = nil,
         tweakProvider: (() -> SIMD4<Float>)? = nil
     ) {
         let fallbackDuration = Float(duration)
         self.durationProvider = durationProvider ?? { fallbackDuration }
         self.elapsedTimeProvider = elapsedTimeProvider
-        self.tweakProvider = tweakProvider ?? { SIMD4<Float>(1, 0, 0, 0) }
+        self.randomSeedProvider = randomSeedProvider ?? { ShaderTweakDefaults.randomSeed }
+        self.tweakProvider = tweakProvider ?? { ShaderTweakDefaults.neutral }
 
         guard let commandQueue = device.makeCommandQueue() else {
             return nil
@@ -102,6 +106,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
             viewportSize: viewportSize,
             elapsedTime: elapsedTime,
             totalDuration: totalDuration,
+            randomSeed: randomSeedProvider(),
             tweaks: tweakProvider()
         )
 
