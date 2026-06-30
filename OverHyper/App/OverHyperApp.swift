@@ -30,6 +30,12 @@ struct OverHyperApp: App {
                     appDelegate.showSettingsWindow()
                 }
                 .keyboardShortcut(",", modifiers: .command)
+
+                #if DEBUG
+                Button("Shader Lab...") {
+                    appDelegate.showShaderLabWindow()
+                }
+                #endif
             }
         }
     }

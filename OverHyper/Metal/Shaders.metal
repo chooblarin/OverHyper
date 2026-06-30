@@ -15,6 +15,8 @@ struct ShaderUniforms {
     float2 viewportSize;
     float elapsedTime;
     float totalDuration;
+    // tweaks: x = intensity, y/z/w = reserved for Shader Lab controls.
+    float4 tweaks;
 };
 
 struct LightningRibbonVertex {
@@ -54,6 +56,10 @@ float hash21(float2 value) {
 float3 sampleSource(texture2d<float> sourceTexture, float2 uv) {
     constexpr sampler textureSampler(address::clamp_to_edge, filter::linear);
     return sourceTexture.sample(textureSampler, uv).rgb;
+}
+
+float shaderIntensity(constant ShaderUniforms &uniforms) {
+    return max(uniforms.tweaks.x, 0.0);
 }
 
 float luminance(float3 color) {
@@ -657,6 +663,7 @@ fragment float4 glitchFragmentShader(
     constant ShaderUniforms &uniforms [[buffer(0)]]
 ) {
     float time = uniforms.elapsedTime;
+    float intensity = shaderIntensity(uniforms);
     float freezeEnd = uniforms.totalDuration * 0.08;
     float rampIn = smoothstep(freezeEnd, uniforms.totalDuration * 0.20, time);
     float rampOut = 1.0 - smoothstep(uniforms.totalDuration * 0.72, uniforms.totalDuration, time);
@@ -719,7 +726,7 @@ fragment float4 glitchFragmentShader(
     styledColor = max(styledColor, glitchColor * (1.0 + glow));
     styledColor *= vignette;
 
-    float3 finalColor = mix(baseColor, styledColor, peakAmount);
+    float3 finalColor = mix(baseColor, styledColor, saturate(peakAmount * intensity));
     return float4(saturate(finalColor), 1.0);
 }
 
@@ -729,6 +736,7 @@ fragment float4 crtBurstFragmentShader(
     constant ShaderUniforms &uniforms [[buffer(0)]]
 ) {
     float time = uniforms.elapsedTime;
+    float intensity = shaderIntensity(uniforms);
     float rampIn = smoothstep(uniforms.totalDuration * 0.10, uniforms.totalDuration * 0.24, time);
     float rampOut = 1.0 - smoothstep(uniforms.totalDuration * 0.55, uniforms.totalDuration, time);
     float burstAmount = rampIn * rampOut;
@@ -754,7 +762,7 @@ fragment float4 crtBurstFragmentShader(
     crtColor = max(crtColor, float3(red, green, blue) * (1.0 + bloom));
     crtColor *= vignette;
 
-    float3 finalColor = mix(baseColor, crtColor, burstAmount);
+    float3 finalColor = mix(baseColor, crtColor, saturate(burstAmount * intensity));
     return float4(saturate(finalColor), 1.0);
 }
 
@@ -766,6 +774,7 @@ fragment float4 shockwaveFragmentShader(
     float2 uv = in.textureCoordinate;
     float3 baseColor = sampleSource(sourceTexture, uv);
     float time = uniforms.elapsedTime;
+    float intensity = shaderIntensity(uniforms);
 
     float progress = saturate(
         (time - (uniforms.totalDuration * 0.12))
@@ -814,7 +823,11 @@ fragment float4 shockwaveFragmentShader(
     refracted += float3(0.04, 0.06, 0.10) * innerRipples;
     refracted *= 1.0 + (highlight * 0.30);
 
-    float3 finalColor = mix(baseColor, refracted, saturate((compression * 1.9) + (trailingRipples * 0.8) + (innerRipples * 0.35)));
+    float3 finalColor = mix(
+        baseColor,
+        refracted,
+        saturate(((compression * 1.9) + (trailingRipples * 0.8) + (innerRipples * 0.35)) * intensity)
+    );
     return float4(saturate(finalColor), 1.0);
 }
 
@@ -825,6 +838,7 @@ fragment float4 crackedGlassFragmentShader(
 ) {
     float time = uniforms.elapsedTime;
     float duration = uniforms.totalDuration;
+    float intensity = shaderIntensity(uniforms);
     float2 uv = in.textureCoordinate;
     float3 baseColor = sampleSource(sourceTexture, uv);
     CrackedGlassContext context = makeCrackedGlassContext(uniforms);
@@ -872,7 +886,7 @@ fragment float4 crackedGlassFragmentShader(
         ).color;
         crackedColor = accumulated * 0.25;
     }
-    float compositeAmount = saturate(reveal * 0.94);
+    float compositeAmount = saturate(reveal * 0.94 * intensity);
     float3 finalColor = mix(baseColor, crackedColor, compositeAmount);
     return float4(saturate(finalColor), 1.0);
 }
@@ -883,6 +897,7 @@ fragment float4 neonEdgeFragmentShader(
     constant ShaderUniforms &uniforms [[buffer(0)]]
 ) {
     float time = uniforms.elapsedTime;
+    float intensity = shaderIntensity(uniforms);
     float rampIn = smoothstep(uniforms.totalDuration * 0.08, uniforms.totalDuration * 0.20, time);
     float rampOut = 1.0 - smoothstep(uniforms.totalDuration * 0.55, uniforms.totalDuration, time);
     float edgeAmount = rampIn * rampOut;
@@ -928,7 +943,7 @@ fragment float4 neonEdgeFragmentShader(
     finalColor += float3(noise);
     finalColor += edgeColor * (luminance(baseColor) * 0.08 * edgeAmount);
 
-    return float4(saturate(mix(baseColor, finalColor, edgeAmount)), 1.0);
+    return float4(saturate(mix(baseColor, finalColor, saturate(edgeAmount * intensity))), 1.0);
 }
 
 fragment float4 rainGlassFragmentShader(
@@ -938,7 +953,7 @@ fragment float4 rainGlassFragmentShader(
 ) {
     float2 uv = in.textureCoordinate;
     float3 baseColor = sampleSource(sourceTexture, uv);
-    float envelope = rainEnvelope(uniforms);
+    float envelope = rainEnvelope(uniforms) * shaderIntensity(uniforms);
 
     if (envelope <= 0.0001) {
         return float4(baseColor, 1.0);

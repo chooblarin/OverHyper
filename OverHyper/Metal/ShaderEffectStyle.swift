@@ -1,10 +1,31 @@
-enum ShaderEffectStyle {
+enum ShaderEffectStyle: CaseIterable, Identifiable {
     case glitch
     case crtBurst
     case shockwave
     case crackedGlass
     case neonEdge
     case rainGlass
+
+    var id: Self {
+        self
+    }
+
+    var displayName: String {
+        switch self {
+        case .glitch:
+            return "Glitch"
+        case .crtBurst:
+            return "CRT Burst"
+        case .shockwave:
+            return "Shockwave"
+        case .crackedGlass:
+            return "Cracked Glass"
+        case .neonEdge:
+            return "Neon Edge"
+        case .rainGlass:
+            return "Rain Glass"
+        }
+    }
 
     var fragmentFunctionName: String {
         switch self {

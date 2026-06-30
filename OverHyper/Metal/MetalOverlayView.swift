@@ -13,7 +13,10 @@ final class MetalOverlayView: MTKView {
         frame frameRect: NSRect,
         image: CGImage,
         style: ShaderEffectStyle,
-        duration: TimeInterval
+        duration: TimeInterval,
+        durationProvider: (() -> Float)? = nil,
+        elapsedTimeProvider: (() -> Float)? = nil,
+        tweakProvider: (() -> SIMD4<Float>)? = nil
     ) {
         guard let device = MTLCreateSystemDefaultDevice() else {
             return nil
@@ -23,7 +26,10 @@ final class MetalOverlayView: MTKView {
             device: device,
             image: image,
             style: style,
-            duration: duration
+            duration: duration,
+            durationProvider: durationProvider,
+            elapsedTimeProvider: elapsedTimeProvider,
+            tweakProvider: tweakProvider
         ) else {
             return nil
         }

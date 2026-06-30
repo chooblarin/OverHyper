@@ -41,6 +41,8 @@ private struct LightningUniforms {
     let viewportSize: SIMD2<Float>
     let elapsedTime: Float
     let totalDuration: Float
+    // Keep this layout aligned with ShaderUniforms in Shaders.metal.
+    let tweaks: SIMD4<Float>
 }
 
 private struct LightningSpawn {
@@ -174,7 +176,8 @@ final class LightningMetalRenderer: NSObject, MTKViewDelegate {
         var uniforms = LightningUniforms(
             viewportSize: viewportSize,
             elapsedTime: elapsedTime,
-            totalDuration: duration
+            totalDuration: duration,
+            tweaks: SIMD4<Float>(1, 0, 0, 0)
         )
         let groupedInstances = activeInstances(at: elapsedTime)
 

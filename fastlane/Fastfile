@@ -1,3 +1,5 @@
+require "shellwords"
+
 default_platform(:mac)
 
 platform :mac do
@@ -102,30 +104,34 @@ platform :mac do
     end
   end
 
-  private_lane :clean_dist do
-    sh("mkdir -p dist")
-    sh("rm -rf dist/OverHyper.app")
+  private_lane :clean_dist_app do |options|
+    dist_path = File.expand_path("../dist", __dir__)
+    app_path = File.join(dist_path, options.fetch(:app_name))
+
+    sh("mkdir -p #{Shellwords.escape(dist_path)}")
+    sh("rm -rf #{Shellwords.escape(app_path)}")
   end
 
-  lane :self_use_build do
-    require "shellwords"
-
-    build_path = "/tmp/OverHyperBuild"
-    derived_data_path = "/tmp/OverHyperDerivedRelease"
-    packages_path = "/tmp/OverHyperPackages"
-    app_product_path = "#{derived_data_path}/Build/Products/Release/OverHyper.app"
+  private_lane :build_app_to_dist do |options|
+    configuration = options.fetch(:configuration)
+    app_name = options.fetch(:app_name)
+    build_path = options.fetch(:build_path)
+    derived_data_path = options.fetch(:derived_data_path)
+    packages_path = options.fetch(:packages_path)
+    app_product_path = "#{derived_data_path}/Build/Products/#{configuration}/OverHyper.app"
+    app_output_path = File.expand_path("../dist/#{app_name}", __dir__)
     escaped_identity = Shellwords.escape(ENV.fetch("OVERHYPER_CODE_SIGN_IDENTITY"))
     metal_toolchain_identifier = Actions.lane_context.fetch(
       :OVERHYPER_METAL_TOOLCHAIN_IDENTIFIER
     )
     escaped_metal_toolchain = Shellwords.escape(metal_toolchain_identifier)
 
-    clean_dist
+    clean_dist_app(app_name: app_name)
 
     build_mac_app(
       project: "OverHyper.xcodeproj",
       scheme: "OverHyper",
-      configuration: "Release",
+      configuration: configuration,
       clean: true,
       skip_archive: true,
       skip_package_pkg: true,
@@ -145,23 +151,45 @@ platform :mac do
       UI.user_error!("Built app not found: #{app_product_path}")
     end
 
-    sh("ditto '#{app_product_path}' dist/OverHyper.app")
+    sh("ditto #{Shellwords.escape(app_product_path)} #{Shellwords.escape(app_output_path)}")
+  end
 
-    UI.success("Built app: dist/OverHyper.app")
-    UI.message("Launch with: open dist/OverHyper.app")
+  lane :self_use_build do
+    build_app_to_dist(
+      configuration: "Release",
+      app_name: "OverHyper.app",
+      build_path: "/tmp/OverHyperBuild",
+      derived_data_path: "/tmp/OverHyperDerivedRelease",
+      packages_path: "/tmp/OverHyperPackages"
+    )
+  end
+
+  lane :debug_build do
+    build_app_to_dist(
+      configuration: "Debug",
+      app_name: "OverHyper-Debug.app",
+      build_path: "/tmp/OverHyperBuildDebug",
+      derived_data_path: "/tmp/OverHyperDerivedDebug",
+      packages_path: "/tmp/OverHyperPackages"
+    )
   end
 
   after_all do |lane|
-    next unless lane == :self_use_build
-
-    UI.success("fastlane self_use_build completed")
-    UI.message("Built app: dist/OverHyper.app")
-    UI.message("Launch with: open dist/OverHyper.app")
+    case lane
+    when :self_use_build
+      UI.success("fastlane self_use_build completed")
+      UI.message("Built app: dist/OverHyper.app")
+      UI.message("Launch with: open dist/OverHyper.app")
+    when :debug_build
+      UI.success("fastlane debug_build completed")
+      UI.message("Built debug app: dist/OverHyper-Debug.app")
+      UI.message("Launch with: open dist/OverHyper-Debug.app")
+    end
   end
 
   error do |lane, exception|
     UI.error("fastlane lane failed: #{lane}")
     UI.error(exception.message)
-    UI.important("Retry with: bundle exec fastlane self_use_build")
+    UI.important("Retry with: bundle exec fastlane #{lane}")
   end
 end

@@ -1,11 +1,17 @@
 import Cocoa
 import OSLog
+#if DEBUG
+import SwiftUI
+#endif
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var runtime: AppRuntime?
     private var openSettingsAction: (@MainActor () -> Void)?
+    #if DEBUG
+    private var shaderLabWindow: NSWindow?
+    #endif
 
     private let logger = Logger(subsystem: "OverHyper", category: "AppDelegate")
 
@@ -61,6 +67,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(openSettings),
             keyEquivalent: ","
         ))
+        #if DEBUG
+        menu.addItem(makeMenuItem(
+            title: "Shader Lab...",
+            action: #selector(openShaderLab),
+            keyEquivalent: ""
+        ))
+        #endif
         menu.addItem(NSMenuItem.separator())
         menu.addItem(makeMenuItem(
             title: "Quit OverHyper",
@@ -108,6 +121,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    #if DEBUG
+    func showShaderLabWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let shaderLabWindow {
+            shaderLabWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 980, height: 620),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Shader Lab"
+        window.contentViewController = NSHostingController(rootView: ShaderLabView())
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.makeKeyAndOrderFront(nil)
+        shaderLabWindow = window
+    }
+    #endif
+
     @objc private func fireConfetti() {
         fire(.confetti)
     }
@@ -143,6 +179,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openSettings() {
         showSettingsWindow()
     }
+
+    #if DEBUG
+    @objc private func openShaderLab() {
+        showShaderLabWindow()
+    }
+    #endif
 
     @objc private func quit() {
         NSApp.terminate(nil)
