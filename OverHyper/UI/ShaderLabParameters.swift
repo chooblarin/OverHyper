@@ -25,7 +25,7 @@ struct ShaderLabParameter: Identifiable {
     }
 }
 
-struct ShaderLabParameterValues: Equatable {
+struct ShaderLabParameterValues: Codable, Equatable {
     var slotX: Double
     var slotY: Double
     var slotZ: Double

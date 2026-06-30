@@ -4,6 +4,7 @@ import SwiftUI
 import simd
 
 struct ShaderLabView: View {
+    @StateObject private var presetStore = ShaderLabPresetStore()
     @State private var selectedStyle = ShaderEffectStyle.glitch
     @State private var duration = 1.6
     @State private var randomSeed = Double(ShaderTweakDefaults.randomSeed)
@@ -12,6 +13,7 @@ struct ShaderLabView: View {
     @State private var pausedTime = 0.0
     @State private var playbackAnchorDate = Date()
     @State private var playbackAnchorTime = 0.0
+    @State private var presetPendingDeletion: ShaderLabPreset?
 
     private let sampleImage = ShaderPreviewImage.make()
     private let parameterColumns = [
@@ -20,43 +22,28 @@ struct ShaderLabView: View {
     ]
 
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let currentTime = previewTime(at: timeline.date)
-            let parameterValues = currentParameterValues
+        HStack(spacing: 0) {
+            effectSidebar
 
-            HStack(spacing: 0) {
-                effectSidebar
+            Divider()
 
-                Divider()
-
-                VStack(spacing: 16) {
-                    ShaderPreviewMetalView(
-                        style: selectedStyle,
-                        image: sampleImage,
-                        elapsedTime: currentTime,
-                        duration: duration,
-                        randomSeed: randomSeed,
-                        tweaks: parameterValues.vector
-                    )
-                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                    .background(.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                    controls(
-                        currentTime: currentTime,
-                        parameterValues: parameterValues
-                    )
-                }
+            mainArea(parameterValues: currentParameterValues)
                 .padding(20)
-            }
         }
         .frame(minWidth: 920, minHeight: 560)
-        .onChange(of: selectedStyle) {
-            restart()
-        }
         .onChange(of: duration) {
             pausedTime = min(pausedTime, duration)
             playbackAnchorTime = min(playbackAnchorTime, duration)
+        }
+        .alert(item: $presetPendingDeletion) { preset in
+            Alert(
+                title: Text("Delete Preset?"),
+                message: Text(preset.name),
+                primaryButton: .destructive(Text("Delete")) {
+                    presetStore.delete(preset)
+                },
+                secondaryButton: .cancel()
+            )
         }
     }
 
@@ -73,7 +60,7 @@ struct ShaderLabView: View {
 
             ForEach(ShaderEffectStyle.allCases) { style in
                 Button {
-                    selectedStyle = style
+                    selectStyle(style)
                 } label: {
                     HStack {
                         Text(style.displayName)
@@ -99,6 +86,35 @@ struct ShaderLabView: View {
         }
         .frame(width: 190)
         .padding(16)
+    }
+
+    private func mainArea(parameterValues: ShaderLabParameterValues) -> some View {
+        VStack(spacing: 16) {
+            TimelineView(.animation) { timeline in
+                let currentTime = previewTime(at: timeline.date)
+
+                VStack(spacing: 16) {
+                    ShaderPreviewMetalView(
+                        style: selectedStyle,
+                        image: sampleImage,
+                        elapsedTime: currentTime,
+                        duration: duration,
+                        randomSeed: randomSeed,
+                        tweaks: parameterValues.vector
+                    )
+                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                    .background(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    controls(
+                        currentTime: currentTime,
+                        parameterValues: parameterValues
+                    )
+                }
+            }
+
+            presetSection(parameterValues: parameterValues)
+        }
     }
 
     private func controls(
@@ -173,6 +189,82 @@ struct ShaderLabView: View {
                 )
             }
         }
+    }
+
+    private func presetSection(parameterValues: ShaderLabParameterValues) -> some View {
+        let presets = presetStore.presets(for: selectedStyle)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Text("Presets")
+                    .font(.headline)
+
+                if let errorMessage = presetStore.errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Spacer()
+
+                Button {
+                    savePreset(parameterValues: parameterValues)
+                } label: {
+                    Label("Save", systemImage: "plus")
+                }
+                .help("Save Current Preset")
+            }
+
+            if presets.isEmpty {
+                Text("No presets")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(presets) { preset in
+                            presetRow(preset)
+                        }
+                    }
+                }
+                .frame(maxHeight: 150)
+            }
+        }
+    }
+
+    private func presetRow(_ preset: ShaderLabPreset) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                applyPreset(preset)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(preset.name)
+                        .lineLimit(1)
+                    Text(presetSummary(preset))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Apply Preset")
+
+            Button {
+                presetPendingDeletion = preset
+            } label: {
+                Image(systemName: "trash")
+                    .frame(width: 18)
+            }
+            .buttonStyle(.borderless)
+            .help("Delete Preset")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func parameterBinding(for parameter: ShaderLabParameter) -> Binding<Double> {
@@ -255,6 +347,28 @@ struct ShaderLabView: View {
         isPlaying = true
     }
 
+    private func selectStyle(_ style: ShaderEffectStyle) {
+        selectedStyle = style
+        restart()
+    }
+
+    private func savePreset(parameterValues: ShaderLabParameterValues) {
+        presetStore.saveCurrent(
+            style: selectedStyle,
+            duration: duration,
+            randomSeed: randomSeed,
+            parameters: parameterValues
+        )
+    }
+
+    private func applyPreset(_ preset: ShaderLabPreset) {
+        selectedStyle = preset.style
+        duration = preset.duration
+        randomSeed = preset.randomSeed
+        parameterValuesByStyle[preset.style] = preset.parameters
+        restart()
+    }
+
     private func resetCurrentEffect() {
         parameterValuesByStyle[selectedStyle] = ShaderLabParameterValues.defaults(
             for: selectedStyle
@@ -266,6 +380,12 @@ struct ShaderLabView: View {
 
     private func timeText(_ currentTime: Double) -> String {
         "\(String(format: "%.2f", currentTime)) / \(String(format: "%.2f", duration))"
+    }
+
+    private func presetSummary(_ preset: ShaderLabPreset) -> String {
+        let durationText = String(format: "%.1fs", preset.duration)
+        let seedText = String(format: "%.0f", preset.randomSeed)
+        return "\(durationText) / seed \(seedText)"
     }
 }
 

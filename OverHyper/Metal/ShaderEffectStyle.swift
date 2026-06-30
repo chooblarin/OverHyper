@@ -1,4 +1,4 @@
-enum ShaderEffectStyle: CaseIterable, Hashable, Identifiable {
+enum ShaderEffectStyle: String, CaseIterable, Codable, Hashable, Identifiable {
     case glitch
     case crtBurst
     case shockwave
