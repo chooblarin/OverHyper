@@ -88,32 +88,29 @@ enum PresentationTargetWarning: Equatable {
     }
 }
 
-struct PresentationTargetResolution {
-    let screens: [NSScreen]
-    let displayIDs: Set<CGDirectDisplayID>
-    let warning: PresentationTargetWarning?
-}
-
 struct PresentationDisplayResolution {
     let displayIDs: Set<CGDirectDisplayID>
     let warning: PresentationTargetWarning?
 }
 
+@MainActor
 enum DisplayCatalog {
     static func snapshots() -> [DisplaySnapshot] {
-        NSScreen.screens.compactMap { screen in
-            guard let displayID = displayID(for: screen) else {
-                return nil
-            }
+        NSScreen.screens.compactMap(snapshot(for:))
+    }
 
-            return DisplaySnapshot(
-                id: displayID,
-                name: screen.localizedName,
-                frame: screen.frame,
-                isMain: displayID == CGMainDisplayID(),
-                isExternal: isExternal(displayID: displayID)
-            )
+    static func snapshot(for screen: NSScreen) -> DisplaySnapshot? {
+        guard let displayID = displayID(for: screen) else {
+            return nil
         }
+
+        return DisplaySnapshot(
+            id: displayID,
+            name: screen.localizedName,
+            frame: screen.frame,
+            isMain: displayID == CGMainDisplayID(),
+            isExternal: isExternal(displayID: displayID)
+        )
     }
 
     static func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
@@ -154,49 +151,8 @@ enum DisplayCatalog {
     }
 }
 
+@MainActor
 enum PresentationTargetResolver {
-    static func resolve(
-        screens: [NSScreen],
-        target: PresentationTarget
-    ) -> PresentationTargetResolution {
-        let screenEntries = screens.compactMap { screen -> ScreenEntry? in
-            guard let displayID = DisplayCatalog.displayID(for: screen) else {
-                return nil
-            }
-
-            return ScreenEntry(
-                screen: screen,
-                displayID: displayID,
-                isExternal: DisplayCatalog.isExternal(displayID: displayID)
-            )
-        }
-        let usesNonMainFallback = shouldUseNonMainExternalFallback(
-            physicalExternalCount: screenEntries.filter(\.isExternal).count,
-            displayCount: screenEntries.count
-        )
-        let matchedEntries = screenEntries.filter { entry in
-            isTargeted(
-                displayID: entry.displayID,
-                isExternal: entry.isExternal,
-                target: target,
-                usesNonMainFallback: usesNonMainFallback
-            )
-        }
-        let matchedDisplayIDs = Set(matchedEntries.map(\.displayID))
-
-        return PresentationTargetResolution(
-            screens: matchedEntries.map(\.screen),
-            displayIDs: matchedDisplayIDs,
-            warning: warning(
-                for: target,
-                matchedDisplayCount: matchedDisplayIDs.count,
-                availableDisplayCount: screenEntries.count,
-                onlineExternalDisplayCount: DisplayCatalog.onlineExternalDisplayCount(),
-                sourceDisplayCount: screens.count
-            )
-        )
-    }
-
     static func resolve(
         displays: [DisplaySnapshot],
         target: PresentationTarget
@@ -302,9 +258,4 @@ enum PresentationTargetResolver {
         }
     }
 
-    private struct ScreenEntry {
-        let screen: NSScreen
-        let displayID: CGDirectDisplayID
-        let isExternal: Bool
-    }
 }

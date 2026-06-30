@@ -19,10 +19,13 @@ requires a composited share window or virtual camera pipeline.
 The app keeps its existing overlay-window architecture:
 
 1. Create full-screen, click-through overlay windows for connected displays.
-2. Rebuild overlay surfaces when display parameters or Spaces change.
-3. At effect fire time, resolve the current presentation target.
-4. Keep the matched displays and any warning in a target resolution value.
-5. Render the effect only into surfaces that match the target.
+2. Keep overlay surface topology synchronized with the current display IDs.
+3. Refresh existing window placement when Spaces change instead of recreating
+   windows.
+4. At effect fire time, ensure the surface topology before resolving the target.
+5. Resolve the target from fresh display snapshots and keep any warning in the
+   resolution value.
+6. Render the effect only into surfaces that match the target.
 
 This preserves compatibility with Keynote full-screen playback and avoids coupling
 individual effects to display selection logic.
@@ -44,10 +47,15 @@ different display.
 
 Target resolution is explicit so presentation failures are diagnosable:
 
-- `PresentationTargetResolution` is used by overlay rendering.
-- `PresentationDisplayResolution` is used by settings UI display state.
+- `PresentationDisplayResolution` is used by overlay rendering and settings UI
+  display state.
 - `PresentationTargetWarning` explains zero-target states such as no external
   displays, a disconnected selected display, or unavailable display IDs.
+
+`OverlaySurfaceManager` owns overlay window lifecycle. It checks display ID
+topology before each render, and refreshes window frames and z-order only after
+rebuilds or Space changes. This keeps target resolution independent from window
+placement and avoids repeated order-front work during effect rendering.
 
 External displays are resolved by physical display type rather than by main-display
 status, so a projector can still be targeted when macOS treats it as the main
